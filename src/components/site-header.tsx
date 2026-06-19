@@ -67,7 +67,7 @@ export function SiteHeader() {
                 <Link to="/auth">Login</Link>
               </Button>
               <Button asChild size="sm" className="bg-gradient-red text-primary-foreground shadow-red hover:opacity-90">
-                <Link to="/auth" search={{ tab: "signup" }}>
+                <Link to="/auth">
                   Join Now
                 </Link>
               </Button>

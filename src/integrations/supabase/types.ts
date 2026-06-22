@@ -461,6 +461,24 @@ export type Database = {
         Args: Record<string, never>
         Returns: Record<string, unknown>[]
       }
+      admin_update_user: {
+        Args: {
+          p_user_id: string
+          p_password?: string
+          p_name?: string
+        }
+        Returns: Record<string, string>
+      }
+      admin_delete_user: {
+        Args: {
+          p_user_id: string
+        }
+        Returns: Record<string, string>
+      }
+      check_renewals: {
+        Args: Record<string, never>
+        Returns: Record<string, unknown>
+      }
     }
     Enums: {
       app_role: "admin" | "member" | "trainer"

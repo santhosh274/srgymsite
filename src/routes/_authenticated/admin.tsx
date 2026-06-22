@@ -3,9 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  Users, CreditCard, ClipboardList, Calendar, BellRing, Trophy, Search, Plus, Trash2,
-  CheckCircle2, XCircle, Megaphone, Download, IndianRupee, TrendingUp, Activity, ShieldOff,
-  Eye, EyeOff, UserPlus,
+  Users, Search, Plus, Trash2, Megaphone, Download, IndianRupee, TrendingUp, Activity,
+  Eye, EyeOff, UserPlus, BellRing, Settings,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/app-shell";
@@ -38,31 +37,23 @@ export const Route = createFileRoute("/_authenticated/admin")({
 
 function Admin() {
   return (
-    <AppShell title="Admin Control" subtitle="Members, payments, attendance and more.">
+    <AppShell title="Admin Control" subtitle="Manage your gym">
       <Tabs defaultValue="overview">
         <TabsList className="flex flex-wrap bg-muted">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="members">Members</TabsTrigger>
           <TabsTrigger value="plans">Plans</TabsTrigger>
-          <TabsTrigger value="payments">Payments</TabsTrigger>
-          <TabsTrigger value="attendance">Attendance</TabsTrigger>
-          <TabsTrigger value="leaves">Leaves</TabsTrigger>
+          <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="notifs">Broadcast</TabsTrigger>
           <TabsTrigger value="holidays">Holidays</TabsTrigger>
-          <TabsTrigger value="trainers">Trainers</TabsTrigger>
-          <TabsTrigger value="contact">Inbox</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-5"><Overview /></TabsContent>
         <TabsContent value="members" className="mt-5"><MembersTab /></TabsContent>
         <TabsContent value="plans" className="mt-5"><PlansTab /></TabsContent>
-        <TabsContent value="payments" className="mt-5"><PaymentsTab /></TabsContent>
-        <TabsContent value="attendance" className="mt-5"><AttendanceTab /></TabsContent>
-        <TabsContent value="leaves" className="mt-5"><LeavesTab /></TabsContent>
+        <TabsContent value="users" className="mt-5"><UsersTab /></TabsContent>
         <TabsContent value="notifs" className="mt-5"><BroadcastTab /></TabsContent>
         <TabsContent value="holidays" className="mt-5"><HolidaysTab /></TabsContent>
-        <TabsContent value="trainers" className="mt-5"><TrainersTab /></TabsContent>
-        <TabsContent value="contact" className="mt-5"><ContactTab /></TabsContent>
       </Tabs>
     </AppShell>
   );
@@ -86,6 +77,11 @@ function Overview() {
     queryKey: ["a-attendance"],
     queryFn: async () => (await supabase.from("attendance").select("date")).data ?? [],
   });
+  const { data: todayCheckins = [] } = useQuery({
+    queryKey: ["a-today-checkins"],
+    queryFn: async () =>
+      (await supabase.from("attendance").select("*, profiles(full_name)").eq("date", new Date().toISOString().slice(0, 10)).order("check_in", { ascending: false })).data ?? [],
+  });
 
   const activeMembers = memberships.filter((m) => daysBetween(m.end_date) >= 0).length;
   const expiredMembers = memberships.filter((m) => daysBetween(m.end_date) < 0).length;
@@ -103,6 +99,28 @@ function Overview() {
         <Stat icon={Activity} label="Today's check-ins" value={todayAttendance} sub="live count" />
         <Stat icon={TrendingUp} label="Overdue payments" value={overdue} sub="needs follow-up" tone={overdue > 0 ? "danger" : "ok"} />
       </div>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-base">Today's check-ins ({todayCheckins.length})</CardTitle>
+          <Button variant="outline" size="sm" onClick={async () => {
+            const { error } = await supabase.rpc("check_renewals");
+            if (error) toast.error(error.message);
+            else toast.success("Renewal notifications checked");
+          }}><BellRing className="mr-1.5 h-4 w-4" /> Check renewals</Button>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-2 md:grid-cols-3">
+            {todayCheckins.map((a: any) => (
+              <div key={a.id} className="rounded-lg border border-border bg-surface p-3 text-sm">
+                <div className="font-medium">{a.profiles?.full_name}</div>
+                <div className="text-xs text-muted-foreground">{new Date(a.check_in).toLocaleTimeString()}</div>
+              </div>
+            ))}
+            {todayCheckins.length === 0 && <p className="text-sm text-muted-foreground">No check-ins yet today.</p>}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader><CardTitle className="text-base">Quick actions</CardTitle></CardHeader>
@@ -249,14 +267,12 @@ function AddUserDialog({ onDone }: { onDone: () => void }) {
     setLoading(true);
 
     try {
-      // 1. Save current admin session
       const { data: sessionData } = await supabase.auth.getSession();
       const adminToken = sessionData.session?.access_token;
       const adminRefresh = sessionData.session?.refresh_token;
       const adminUserId = sessionData.session?.user?.id;
       if (!adminToken) throw new Error("No admin session");
 
-      // 2. Create auth user via signUp (auto-confirmed since email confirm is disabled)
       const email = `${idNo.trim().toLowerCase()}@srgym.local`;
       const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
         email,
@@ -266,7 +282,6 @@ function AddUserDialog({ onDone }: { onDone: () => void }) {
       if (signUpErr) throw signUpErr;
       if (!signUpData?.user) throw new Error("Signup returned no user");
 
-      // 3. Restore admin session and verify it worked
       const { error: restoreErr } = await supabase.auth.setSession({
         access_token: adminToken,
         refresh_token: adminRefresh!,
@@ -277,7 +292,6 @@ function AddUserDialog({ onDone }: { onDone: () => void }) {
       if (verifySession.session?.user?.id !== adminUserId)
         throw new Error("Session was not properly restored");
 
-      // 4. Create auth mapping via RPC
       const { error: rpcErr } = await supabase.rpc("admin_create_user", {
         p_id_no: idNo.trim(),
         p_password: password,
@@ -341,6 +355,12 @@ function AssignDialog({ member, onDone }: any) {
     queryFn: async () => (await supabase.from("membership_plans").select("*").eq("is_active", true)).data ?? [],
     enabled: open,
   });
+  const tiers = [
+    { name: "Monthly", months: 1 },
+    { name: "3 Months", months: 3 },
+    { name: "6 Months", months: 6 },
+    { name: "Yearly", months: 12 },
+  ];
   const [planId, setPlanId] = useState("");
   const [start, setStart] = useState(new Date().toISOString().slice(0, 10));
   const [amount, setAmount] = useState("");
@@ -400,14 +420,28 @@ function AssignDialog({ member, onDone }: any) {
             <TabsTrigger value="diet">Diet</TabsTrigger>
           </TabsList>
           <TabsContent value="membership" className="mt-4 space-y-3">
-            <div>
-              <Label>Plan</Label>
-              <Select value={planId} onValueChange={setPlanId}>
-                <SelectTrigger><SelectValue placeholder="Choose plan" /></SelectTrigger>
-                <SelectContent>
-                  {plans.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name} — {INR(p.price)} / {p.duration_months}mo</SelectItem>)}
-                </SelectContent>
-              </Select>
+            <Label>Plan</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {tiers.map((tier) => {
+                const p = plans.find((pl: any) => pl.name === tier.name);
+                const selected = planId === p?.id;
+                return (
+                  <button
+                    key={tier.name}
+                    type="button"
+                    onClick={() => p && setPlanId(p.id)}
+                    disabled={!p}
+                    className={`rounded-lg border p-3 text-left transition-colors ${
+                      selected ? 'border-primary bg-primary/10' : 'border-border'
+                    } ${!p ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:border-primary/50'}`}
+                  >
+                    <div className="font-medium">{tier.name}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {p ? `${INR(p.price)} / ${tier.name}` : 'Not configured'}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
             <div><Label>Start date</Label><Input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></div>
             {endDate && <p className="text-sm text-muted-foreground">Ends: <span className="font-medium text-foreground">{fmtDate(endDate)}</span></p>}
@@ -434,130 +468,151 @@ function AssignDialog({ member, onDone }: any) {
   );
 }
 
-/* ---------------- PLANS ---------------- */
+/* ---------------- PLANS (simplified 4-tier) ---------------- */
 function PlansTab() {
   const qc = useQueryClient();
   const { data: plans = [] } = useQuery({
     queryKey: ["a-plans"],
-    queryFn: async () => (await supabase.from("membership_plans").select("*").order("price")).data ?? [],
+    queryFn: async () => (await supabase.from("membership_plans").select("*").order("duration_months")).data ?? [],
   });
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ name: "", duration_months: 1, price: 0, features: "" });
 
-  async function add() {
-    const features = form.features.split("\n").map((s) => s.trim()).filter(Boolean);
-    const { error } = await supabase.from("membership_plans").insert({
-      name: form.name, duration_months: Number(form.duration_months), price: Number(form.price), features,
-    });
-    if (error) return toast.error(error.message);
-    toast.success("Plan created"); setOpen(false);
-    setForm({ name: "", duration_months: 1, price: 0, features: "" });
+  const [prices, setPrices] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (plans.length > 0) {
+      const map: Record<string, number> = {};
+      plans.forEach((p: any) => { map[p.name] = p.price; });
+      setPrices((prev) => ({ ...prev, ...map }));
+    }
+  }, [plans]);
+
+  const tiers = [
+    { name: "Monthly", key: "monthly", months: 1 },
+    { name: "3 Months", key: "3months", months: 3 },
+    { name: "6 Months", key: "6months", months: 6 },
+    { name: "Yearly", key: "yearly", months: 12 },
+  ];
+
+  async function savePrice(name: string, months: number) {
+    const price = prices[name];
+    if (!price || price <= 0) return toast.error("Enter a valid price");
+
+    const existing = plans.find((p: any) => p.name === name);
+    if (existing) {
+      const { error } = await supabase.from("membership_plans").update({ price, duration_months: months }).eq("id", existing.id);
+      if (error) return toast.error(error.message);
+    } else {
+      const { error } = await supabase.from("membership_plans").insert({
+        name, duration_months: months, price, is_active: true,
+      });
+      if (error) return toast.error(error.message);
+    }
     qc.invalidateQueries({ queryKey: ["a-plans"] });
+    toast.success(`${name} plan updated`);
   }
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-base">Membership plans</CardTitle>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button className="bg-gradient-red text-primary-foreground"><Plus className="mr-1 h-4 w-4" /> New plan</Button></DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>New plan</DialogTitle></DialogHeader>
-            <div className="space-y-3">
-              <div><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-              <div className="grid grid-cols-2 gap-3">
-                <div><Label>Duration (months)</Label><Input type="number" value={form.duration_months} onChange={(e) => setForm({ ...form, duration_months: Number(e.target.value) })} /></div>
-                <div><Label>Price (₹)</Label><Input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} /></div>
-              </div>
-              <div><Label>Features (one per line)</Label><Textarea rows={4} value={form.features} onChange={(e) => setForm({ ...form, features: e.target.value })} /></div>
-            </div>
-            <DialogFooter><Button onClick={add} className="bg-gradient-red text-primary-foreground">Create</Button></DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </CardHeader>
-      <CardContent className="grid gap-4 md:grid-cols-3">
-        {plans.map((p: any) => (
-          <div key={p.id} className="rounded-xl border border-border bg-surface p-5">
-            <div className="flex items-start justify-between gap-2">
+    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      {tiers.map((tier) => {
+        const plan = plans.find((p: any) => p.name === tier.name);
+        return (
+          <Card key={tier.key}>
+            <CardHeader>
+              <CardTitle className="text-base">{tier.name}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <div>
-                <h3 className="font-display text-xl font-bold">{p.name}</h3>
-                <p className="text-xs text-muted-foreground">{p.duration_months} months</p>
+                <Label>Price (₹)</Label>
+                <Input
+                  type="number"
+                  value={prices[tier.name] ?? plan?.price ?? ""}
+                  onChange={(e) => setPrices({ ...prices, [tier.name]: Number(e.target.value) })}
+                  placeholder="0"
+                />
               </div>
-              <Badge variant={p.is_active ? "default" : "secondary"}>{p.is_active ? "active" : "off"}</Badge>
-            </div>
-            <p className="mt-3 font-display text-2xl font-extrabold text-primary">{INR(p.price)}</p>
-            <div className="mt-3 flex gap-2">
-              <Button size="sm" variant="outline" onClick={async () => {
-                await supabase.from("membership_plans").update({ is_active: !p.is_active }).eq("id", p.id);
-                qc.invalidateQueries({ queryKey: ["a-plans"] });
-              }}>{p.is_active ? "Disable" : "Enable"}</Button>
-              <DeleteBtn onConfirm={async () => {
-                await supabase.from("membership_plans").delete().eq("id", p.id);
-                qc.invalidateQueries({ queryKey: ["a-plans"] });
-                toast.success("Deleted");
-              }} />
-            </div>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
+              <div className="flex gap-2">
+                <Button onClick={() => savePrice(tier.name, tier.months)} className="flex-1 bg-gradient-red text-primary-foreground">
+                  <Settings className="mr-1.5 h-4 w-4" /> Save
+                </Button>
+                {plan && (
+                  <Button size="icon" variant="outline" onClick={async () => {
+                    await supabase.from("membership_plans").update({ is_active: !plan.is_active }).eq("id", plan.id);
+                    qc.invalidateQueries({ queryKey: ["a-plans"] });
+                  }}>
+                    {plan.is_active ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                )}
+              </div>
+              {plan && (
+                <p className="text-xs text-muted-foreground">
+                  {plan.is_active ? "Active" : "Disabled"} · {plan.duration_months}mo
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
   );
 }
 
-/* ---------------- PAYMENTS ---------------- */
-function PaymentsTab() {
+/* ---------------- USERS ---------------- */
+function UsersTab() {
   const qc = useQueryClient();
-  const { data: payments = [] } = useQuery({
-    queryKey: ["a-pay"],
-    queryFn: async () =>
-      (await supabase.from("payments").select("*, profiles(full_name, email)").order("due_date", { ascending: false })).data ?? [],
+  const [q, setQ] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const { data: users = [] } = useQuery({
+    queryKey: ["a-users", refreshKey],
+    queryFn: async () => (await supabase.from("auth").select("*").order("created_at", { ascending: false })).data ?? [],
   });
 
-  async function setStatus(id: string, status: string) {
-    const upd: any = { status };
-    if (status === "paid") { upd.paid_at = new Date().toISOString(); upd.receipt_no = "RCP-" + Math.random().toString(36).slice(2, 8).toUpperCase(); }
-    await supabase.from("payments").update(upd).eq("id", id);
-    qc.invalidateQueries({ queryKey: ["a-pay"] });
-  }
+  const filtered = users.filter((u: any) =>
+    !q || u.user_id?.toLowerCase().includes(q.toLowerCase()) || u.name?.toLowerCase().includes(q.toLowerCase())
+  );
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-base">All payments</CardTitle>
-        <Button variant="outline" onClick={() => exportCSV("payments", payments)}><Download className="mr-2 h-4 w-4" /> Export CSV</Button>
+      <CardHeader className="flex flex-row items-center justify-between gap-3">
+        <CardTitle className="text-base">Users</CardTitle>
+        <div className="flex items-center gap-2">
+          <div className="flex w-full max-w-xs items-center gap-2">
+            <Search className="h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Search user ID / name" value={q} onChange={(e) => setQ(e.target.value)} />
+          </div>
+          <AddUserDialog onDone={() => setRefreshKey((k) => k + 1)} />
+        </div>
       </CardHeader>
       <CardContent className="overflow-auto p-0">
         <table className="w-full text-sm">
           <thead className="bg-muted text-xs uppercase text-muted-foreground">
             <tr>
-              <th className="px-4 py-3 text-left">Member</th>
-              <th className="px-4 py-3 text-left">Amount</th>
-              <th className="px-4 py-3 text-left">Due</th>
-              <th className="px-4 py-3 text-left">Status</th>
+              <th className="px-4 py-3 text-left">User ID</th>
+              <th className="px-4 py-3 text-left">Name</th>
+              <th className="px-4 py-3 text-left">Role</th>
+              <th className="px-4 py-3 text-left">Created</th>
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody>
-            {payments.map((p: any) => (
-              <tr key={p.id} className="border-t border-border">
-                <td className="px-4 py-3">{p.profiles?.full_name ?? p.user_id.slice(0,6)}</td>
-                <td className="px-4 py-3 font-medium">{INR(p.amount)}</td>
-                <td className="px-4 py-3">{fmtDate(p.due_date)}</td>
+            {filtered.map((u: any) => (
+              <tr key={u.id} className="border-t border-border">
+                <td className="px-4 py-3 font-medium">{u.user_id}</td>
+                <td className="px-4 py-3">{u.name ?? "—"}</td>
                 <td className="px-4 py-3">
-                  <Badge variant={p.status === "paid" ? "default" : p.status === "overdue" ? "destructive" : "secondary"}>{p.status}</Badge>
+                  <Badge variant={u.role === "admin" ? "default" : "secondary"}>{u.role}</Badge>
                 </td>
+                <td className="px-4 py-3 text-muted-foreground">{fmtDate(u.created_at)}</td>
                 <td className="px-4 py-3 text-right">
-                  <Select value={p.status} onValueChange={(v) => setStatus(p.id, v)}>
-                    <SelectTrigger className="h-8 w-32"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pending">pending</SelectItem>
-                      <SelectItem value="paid">paid</SelectItem>
-                      <SelectItem value="overdue">overdue</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <EditUserDialog user={u} onDone={() => qc.invalidateQueries({ queryKey: ["a-users"] })} />
+                  <DeleteBtn onConfirm={async () => {
+                    const { error } = await supabase.rpc("admin_delete_user", { p_user_id: u.user_id });
+                    if (error) toast.error(error.message);
+                    else { toast.success("User deleted"); setRefreshKey((k) => k + 1); }
+                  }} />
                 </td>
               </tr>
             ))}
+            {filtered.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">No users.</td></tr>}
           </tbody>
         </table>
       </CardContent>
@@ -565,102 +620,51 @@ function PaymentsTab() {
   );
 }
 
-/* ---------------- ATTENDANCE ---------------- */
-function AttendanceTab() {
-  const { data: today = [] } = useQuery({
-    queryKey: ["att-today"],
-    queryFn: async () =>
-      (await supabase.from("attendance").select("*, profiles(full_name)").eq("date", new Date().toISOString().slice(0, 10))).data ?? [],
-  });
-  const { data: all = [] } = useQuery({
-    queryKey: ["att-all"],
-    queryFn: async () =>
-      (await supabase.from("attendance").select("date")).data ?? [],
-  });
+function EditUserDialog({ user, onDone }: { user: any; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(user.name ?? "");
+  const [password, setPassword] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const byDay = useMemo(() => {
-    const map = new Map<string, number>();
-    all.forEach((a: any) => map.set(a.date, (map.get(a.date) ?? 0) + 1));
-    return Array.from(map.entries()).sort().slice(-14);
-  }, [all]);
-
-  return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader><CardTitle className="text-base">Today's check-ins ({today.length})</CardTitle></CardHeader>
-        <CardContent className="grid gap-2 md:grid-cols-3">
-          {today.map((a: any) => (
-            <div key={a.id} className="rounded-lg border border-border bg-surface p-3 text-sm">
-              <div className="font-medium">{a.profiles?.full_name}</div>
-              <div className="text-xs text-muted-foreground">{new Date(a.check_in).toLocaleTimeString()}</div>
-            </div>
-          ))}
-          {today.length === 0 && <p className="text-sm text-muted-foreground">No check-ins yet.</p>}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader><CardTitle className="text-base">Last 14 days</CardTitle></CardHeader>
-        <CardContent>
-          <div className="flex items-end gap-1.5">
-            {byDay.map(([d, n]) => (
-              <div key={d} className="flex-1 text-center">
-                <div className="bg-gradient-red mx-auto rounded-t" style={{ height: Math.max(6, n * 12) + "px" }} title={`${d}: ${n}`} />
-                <div className="mt-1 text-[10px] text-muted-foreground">{d.slice(8)}</div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-/* ---------------- LEAVES ---------------- */
-function LeavesTab() {
-  const qc = useQueryClient();
-  const { data: leaves = [] } = useQuery({
-    queryKey: ["a-leaves"],
-    queryFn: async () =>
-      (await supabase.from("leave_requests").select("*, profiles(full_name, email)").order("created_at", { ascending: false })).data ?? [],
-  });
-
-  async function decide(id: string, status: "approved" | "rejected", user_id: string) {
-    await supabase.from("leave_requests").update({ status }).eq("id", id);
-    await supabase.from("notifications").insert({
-      user_id, title: `Leave ${status}`, message: `Your leave request has been ${status}.`, type: status === "approved" ? "success" : "warning",
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    const { error } = await supabase.rpc("admin_update_user", {
+      p_user_id: user.user_id,
+      p_password: password || undefined,
+      p_name: name || undefined,
     });
-    qc.invalidateQueries({ queryKey: ["a-leaves"] });
+    if (error) toast.error(error.message);
+    else { toast.success("User updated"); setOpen(false); onDone(); }
+    setLoading(false);
   }
 
   return (
-    <div className="space-y-3">
-      {leaves.map((l: any) => (
-        <Card key={l.id}>
-          <CardContent className="flex flex-wrap items-center justify-between gap-4 py-4">
-            <div className="min-w-0">
-              <div className="font-medium">{l.profiles?.full_name}</div>
-              <div className="text-xs text-muted-foreground">{fmtDate(l.start_date)} → {fmtDate(l.end_date)}</div>
-              <div className="mt-1 text-sm">{l.reason}</div>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild><Button size="sm" variant="outline" className="mr-1">Edit</Button></DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader><DialogTitle>Edit — {user.user_id}</DialogTitle></DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label htmlFor="eu-name">Name</Label>
+            <Input id="eu-name" value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div>
+            <Label htmlFor="eu-pw">Password (leave blank to keep)</Label>
+            <div className="relative">
+              <Input id="eu-pw" type={showPw ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} />
+              <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground">
+                {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
             </div>
-            <div className="flex items-center gap-2">
-              <Badge variant={l.status === "approved" ? "default" : l.status === "rejected" ? "destructive" : "secondary"}>{l.status}</Badge>
-              {l.status === "pending" && (
-                <>
-                  <Button size="sm" onClick={() => decide(l.id, "approved", l.user_id)} className="bg-green-600 hover:bg-green-700">
-                    <CheckCircle2 className="mr-1 h-3 w-3" /> Approve
-                  </Button>
-                  <Button size="sm" variant="destructive" onClick={() => decide(l.id, "rejected", l.user_id)}>
-                    <XCircle className="mr-1 h-3 w-3" /> Reject
-                  </Button>
-                </>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      ))}
-      {leaves.length === 0 && <p className="text-sm text-muted-foreground">No leave requests.</p>}
-    </div>
+          </div>
+          <Button type="submit" disabled={loading} className="w-full bg-gradient-red text-primary-foreground">
+            {loading ? "Saving..." : "Save Changes"}
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -749,81 +753,6 @@ function HolidaysTab() {
   );
 }
 
-/* ---------------- TRAINERS ---------------- */
-function TrainersTab() {
-  const qc = useQueryClient();
-  const { data: trainers = [] } = useQuery({
-    queryKey: ["a-trainers"],
-    queryFn: async () => (await supabase.from("trainers").select("*").order("name")).data ?? [],
-  });
-  const [form, setForm] = useState({ name: "", specialty: "", bio: "", photo_url: "", experience_years: 0 });
-
-  async function add() {
-    if (!form.name || !form.specialty) return toast.error("Name & specialty required");
-    const { error } = await supabase.from("trainers").insert(form);
-    if (error) return toast.error(error.message);
-    setForm({ name: "", specialty: "", bio: "", photo_url: "", experience_years: 0 });
-    qc.invalidateQueries({ queryKey: ["a-trainers"] });
-    toast.success("Trainer added");
-  }
-
-  return (
-    <div className="grid gap-6 md:grid-cols-2">
-      <Card>
-        <CardHeader><CardTitle className="text-base">Add trainer</CardTitle></CardHeader>
-        <CardContent className="space-y-3">
-          <div><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-          <div><Label>Specialty</Label><Input value={form.specialty} onChange={(e) => setForm({ ...form, specialty: e.target.value })} /></div>
-          <div><Label>Years experience</Label><Input type="number" value={form.experience_years} onChange={(e) => setForm({ ...form, experience_years: Number(e.target.value) })} /></div>
-          <div><Label>Photo URL</Label><Input value={form.photo_url} onChange={(e) => setForm({ ...form, photo_url: e.target.value })} /></div>
-          <div><Label>Bio</Label><Textarea rows={3} value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} /></div>
-          <Button onClick={add} className="bg-gradient-red text-primary-foreground">Add trainer</Button>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader><CardTitle className="text-base">Current team</CardTitle></CardHeader>
-        <CardContent className="space-y-2">
-          {trainers.map((t: any) => (
-            <div key={t.id} className="flex items-center justify-between gap-3 rounded border border-border p-3 text-sm">
-              <div className="min-w-0">
-                <div className="truncate font-medium">{t.name}</div>
-                <div className="truncate text-xs text-muted-foreground">{t.specialty} · {t.experience_years}y</div>
-              </div>
-              <DeleteBtn onConfirm={async () => { await supabase.from("trainers").delete().eq("id", t.id); qc.invalidateQueries({ queryKey: ["a-trainers"] }); }} />
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-/* ---------------- CONTACT ---------------- */
-function ContactTab() {
-  const qc = useQueryClient();
-  const { data: msgs = [] } = useQuery({
-    queryKey: ["a-contact"],
-    queryFn: async () => (await supabase.from("contact_messages").select("*").order("created_at", { ascending: false })).data ?? [],
-  });
-  return (
-    <div className="space-y-2">
-      {msgs.map((m: any) => (
-        <Card key={m.id}>
-          <CardContent className="flex flex-wrap items-start justify-between gap-4 py-4">
-            <div className="min-w-0">
-              <div className="font-medium">{m.name} <span className="font-normal text-muted-foreground">— {m.email}{m.phone ? ` · ${m.phone}` : ""}</span></div>
-              <div className="mt-1 text-sm">{m.message}</div>
-              <div className="mt-1 text-xs text-muted-foreground">{fmtDate(m.created_at)}</div>
-            </div>
-            <DeleteBtn onConfirm={async () => { await supabase.from("contact_messages").delete().eq("id", m.id); qc.invalidateQueries({ queryKey: ["a-contact"] }); }} />
-          </CardContent>
-        </Card>
-      ))}
-      {msgs.length === 0 && <p className="text-sm text-muted-foreground">No messages.</p>}
-    </div>
-  );
-}
-
 /* ---------------- helpers ---------------- */
 function DeleteBtn({ onConfirm }: { onConfirm: () => void | Promise<void> }) {
   return (
@@ -845,4 +774,3 @@ function exportCSV(filename: string, rows: any[]) {
   a.href = url; a.download = `${filename}-${new Date().toISOString().slice(0,10)}.csv`; a.click();
   URL.revokeObjectURL(url);
 }
-  

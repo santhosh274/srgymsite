@@ -1,5 +1,6 @@
--- Remove email from auth table (auth is userID+password only)
-ALTER TABLE public.auth DROP COLUMN email;
+-- Keep email column but allow it to be NULL (email auth disabled)
+ALTER TABLE public.auth ALTER COLUMN email DROP NOT NULL;
+
 
 -- Rewrite admin_create_user to derive email internally
 CREATE OR REPLACE FUNCTION public.admin_create_user(

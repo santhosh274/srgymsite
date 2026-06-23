@@ -33,15 +33,14 @@ export function AppShell({
           </Link>
 
           <nav className="hidden items-center gap-1 md:flex">
-            <Button asChild variant="ghost" size="sm">
-              <Link to="/dashboard"><LayoutDashboard className="mr-1.5 h-4 w-4" /> Dashboard</Link>
-            </Button>
+           
             {isAdmin && (
-              <Button asChild variant="ghost" size="sm">
-                <Link to="/admin"><Shield className="mr-1.5 h-4 w-4" /> Admin</Link>
-              </Button>
-            )}
-          </nav>
+  <span className="flex items-center gap-1.5 text-sm font-semibold">
+    <Shield className="h-4 w-4 text-primary" />
+    Admin
+  </span>
+)}
+          </nav>  
 
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" className="relative">

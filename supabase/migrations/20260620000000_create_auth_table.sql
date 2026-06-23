@@ -5,7 +5,7 @@ CREATE TABLE public.auth (
   user_id text NOT NULL UNIQUE,
   password text NOT NULL,
   role public.app_role NOT NULL DEFAULT 'member',
-  email text NOT NULL,
+  email text,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 

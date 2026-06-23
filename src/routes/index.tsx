@@ -84,8 +84,8 @@ function Home() {
 
             <dl className="mt-12 grid max-w-lg grid-cols-3 gap-6">
               {[
-                { k: "300+", v: "Members" },
-                { k: "5+ yrs", v: "Trusted" },
+                { k: "500+", v: "Members" },
+                { k: "7+ yrs", v: "Trusted" },
               ].map((s) => (
                 <div key={s.v}>
                   <dt className="font-display text-3xl font-extrabold text-foreground">{s.k}</dt>

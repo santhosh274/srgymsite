@@ -19,8 +19,9 @@ function About() {
       <section className="border-b border-border/50 bg-gradient-dark py-24">
         <div className="mx-auto max-w-4xl px-4 text-center sm:px-6">
           <p className="text-xs font-semibold uppercase tracking-widest text-primary">About us</p>
-          <h1 className="mt-3 font-display text-5xl font-extrabold sm:text-6xl">
-            Built by lifters. <span className="text-gradient-red">For lifters.</span>
+          <h1 className="mt-3 font-display text-4xl font-extrabold leading-tight sm:text-5xl lg:text-6xl">
+            <span className="block">Built by lifters.</span>
+            <span className="block text-gradient-red">For lifters.</span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-muted-foreground">
             SR GYM AND FITNESS CENTRE opened in 2019 with one mission — to give our city a serious
@@ -60,8 +61,8 @@ function About() {
           </div>
           <dl className="grid grid-cols-2 gap-6">
             {[
-              { k: "300+", v: "Active members" },
-              { k: "190+", v: "Transformations" },
+              { k: "500+", v: "Active members" },
+              { k: "300+", v: "Transformations" },
               { k: "4.8★", v: "Member rating" },
             ].map((s) => (
               <div key={s.v} className="rounded-xl border border-border bg-surface p-6">

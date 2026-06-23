@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import {
   Search, Trash2, Megaphone, Download, Settings, Calendar,
   CheckCircle2, Clock, AlertCircle, Eye, EyeOff, UserPlus,
-  KeyRound, Dumbbell, Utensils, Plus, X,
+  KeyRound, Dumbbell, Utensils, Plus, X, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/app-shell";
@@ -30,7 +30,10 @@ export const Route = createFileRoute("/_authenticated/admin")({
   beforeLoad: async () => {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) throw redirect({ to: "/auth" });
-    const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", u.user.id);
+    const { data: roles } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", u.user.id);
     const isAdmin = (roles ?? []).some((r) => r.role === "admin");
   },
   component: Admin,
@@ -40,41 +43,45 @@ function Admin() {
   return (
     <AppShell title="Admin Control" subtitle="Manage your gym">
       <Tabs defaultValue="members">
-        <TabsList className="flex flex-wrap bg-muted">
-          <TabsTrigger value="members">Members</TabsTrigger>
-          <TabsTrigger value="active">Active Members</TabsTrigger>
-          <TabsTrigger value="attendance">Attendance</TabsTrigger>
-          <TabsTrigger value="due">Due Payments</TabsTrigger>
-          <TabsTrigger value="plans">Plans</TabsTrigger>
-          <TabsTrigger value="notifs">Broadcast</TabsTrigger>
-          <TabsTrigger value="holidays">Holidays</TabsTrigger>
-        </TabsList>
-        <TabsContent value="members" className="mt-5"><MembersTab /></TabsContent>
-        <TabsContent value="active" className="mt-5"><ActiveMembersTab /></TabsContent>
-        <TabsContent value="attendance" className="mt-5"><AttendanceTab /></TabsContent>
-        <TabsContent value="due" className="mt-5"><DuePaymentsTab /></TabsContent>
-        <TabsContent value="plans" className="mt-5"><PlansTab /></TabsContent>
-        <TabsContent value="notifs" className="mt-5"><BroadcastTab /></TabsContent>
-        <TabsContent value="holidays" className="mt-5"><HolidaysTab /></TabsContent>
+        {/* Horizontally scrollable tab bar — works on any screen width */}
+        <div className="overflow-x-auto -mx-1 px-1">
+          <TabsList className="inline-flex min-w-max gap-0.5 bg-muted rounded-lg p-1">
+            <TabsTrigger value="members" className="text-xs sm:text-sm px-3 py-1.5">Members</TabsTrigger>
+            <TabsTrigger value="active"  className="text-xs sm:text-sm px-3 py-1.5">Active</TabsTrigger>
+            <TabsTrigger value="attendance" className="text-xs sm:text-sm px-3 py-1.5">Attendance</TabsTrigger>
+            <TabsTrigger value="due"    className="text-xs sm:text-sm px-3 py-1.5">Due</TabsTrigger>
+            <TabsTrigger value="plans"  className="text-xs sm:text-sm px-3 py-1.5">Plans</TabsTrigger>
+            <TabsTrigger value="notifs" className="text-xs sm:text-sm px-3 py-1.5">Broadcast</TabsTrigger>
+            <TabsTrigger value="holidays" className="text-xs sm:text-sm px-3 py-1.5">Holidays</TabsTrigger>
+          </TabsList>
+        </div>
+
+        <TabsContent value="members"    className="mt-4"><MembersTab /></TabsContent>
+        <TabsContent value="active"     className="mt-4"><ActiveMembersTab /></TabsContent>
+        <TabsContent value="attendance" className="mt-4"><AttendanceTab /></TabsContent>
+        <TabsContent value="due"        className="mt-4"><DuePaymentsTab /></TabsContent>
+        <TabsContent value="plans"      className="mt-4"><PlansTab /></TabsContent>
+        <TabsContent value="notifs"     className="mt-4"><BroadcastTab /></TabsContent>
+        <TabsContent value="holidays"   className="mt-4"><HolidaysTab /></TabsContent>
       </Tabs>
     </AppShell>
   );
 }
 
-/* ---------------- ATTENDANCE ---------------- */
+/* ─────────────────────────────────────────────
+   ATTENDANCE
+───────────────────────────────────────────── */
 function localDateStr(d = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
-
 function fmtDuration(ms: number) {
   const h = Math.floor(ms / 3600000);
   const m = Math.floor((ms % 3600000) / 60000);
-  if (h === 0) return `${m}m`;
-  return `${h}h ${m}m`;
+  return h === 0 ? `${m}m` : `${h}h ${m}m`;
 }
 
 function AttendanceTab() {
-  const today = localDateStr();
+  const today     = localDateStr();
   const yesterday = localDateStr(new Date(Date.now() - 86400000));
   const [selectedDate, setSelectedDate] = useState(today);
   const [q, setQ] = useState("");
@@ -105,8 +112,6 @@ function AttendanceTab() {
     !q || c.profiles?.full_name?.toLowerCase().includes(q.toLowerCase())
   );
 
-  const quickDates = [{ label: "Today", value: today }, { label: "Yesterday", value: yesterday }];
-
   return (
     <Card>
       <CardHeader>
@@ -115,30 +120,47 @@ function AttendanceTab() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-center gap-3">
+        {/* Controls */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <div className="flex gap-2">
-            {quickDates.map((d) => (
-              <Button key={d.value} size="sm" variant={selectedDate === d.value ? "default" : "outline"} onClick={() => setSelectedDate(d.value)}>
+            {[{ label: "Today", value: today }, { label: "Yesterday", value: yesterday }].map((d) => (
+              <Button key={d.value} size="sm"
+                variant={selectedDate === d.value ? "default" : "outline"}
+                onClick={() => setSelectedDate(d.value)}>
                 {d.label}
               </Button>
             ))}
           </div>
-          <Input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-auto" />
-          <div className="flex items-center gap-2 ml-auto">
-            <Search className="h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search member name" value={q} onChange={(e) => setQ(e.target.value)} className="w-48" />
+          <Input
+            type="date" value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="w-full sm:w-auto"
+          />
+          <div className="flex items-center gap-2 sm:ml-auto">
+            <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+            <Input
+              placeholder="Search member"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              className="flex-1 sm:w-48"
+            />
           </div>
         </div>
+
+        {/* Count summary */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <CheckCircle2 className="h-4 w-4 text-green-500" />
+          <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
           <span>
-            <span className="font-semibold text-foreground">{filtered.length}</span> check-in{filtered.length !== 1 ? "s" : ""} on{" "}
+            <span className="font-semibold text-foreground">{filtered.length}</span>{" "}
+            check-in{filtered.length !== 1 ? "s" : ""} on{" "}
             <span className="font-semibold text-foreground">
               {selectedDate === today ? "Today" : selectedDate === yesterday ? "Yesterday" : fmtDate(selectedDate)}
             </span>
           </span>
         </div>
-        <div className="overflow-auto rounded-lg border border-border">
+
+        {/* Desktop table / Mobile cards */}
+        <div className="hidden sm:block overflow-auto rounded-lg border border-border">
           <table className="w-full text-sm">
             <thead className="bg-muted text-xs uppercase text-muted-foreground">
               <tr>
@@ -154,38 +176,7 @@ function AttendanceTab() {
             <tbody>
               {isLoading && <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">Loading…</td></tr>}
               {!isLoading && filtered.map((a: any, i: number) => (
-                <tr key={a.id} className="border-t border-border">
-                  <td className="px-4 py-3 text-muted-foreground">{i + 1}</td>
-                  <td className="px-4 py-3 font-medium">{a.profiles?.full_name ?? "—"}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{a.profiles?.phone ?? "—"}</td>
-                  <td className="px-4 py-3">
-                    {a.check_in ? (
-                      <Badge variant="outline" className="text-green-600 border-green-300">
-                        {new Date(a.check_in).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" })}
-                      </Badge>
-                    ) : "—"}
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">
-                    {a.check_out
-                      ? new Date(a.check_out).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" })
-                      : <span className="text-xs italic">still in</span>}
-                  </td>
-                  <td className="px-4 py-3">
-                    {a.check_in && a.check_out
-                      ? fmtDuration(new Date(a.check_out).getTime() - new Date(a.check_in).getTime())
-                      : a.check_in
-                      ? fmtDuration(Date.now() - new Date(a.check_in).getTime())
-                      : "—"}
-                  </td>
-                  <td className="px-4 py-3">
-                    {!a.check_out ? (
-                      <Button size="sm" variant="outline" className="border-blue-400 text-blue-600 hover:bg-blue-50"
-                        onClick={() => handleCheckOut(a.id, a.profiles?.full_name ?? "Member")}>
-                        <Clock className="mr-1.5 h-3.5 w-3.5" /> Check Out
-                      </Button>
-                    ) : <span className="text-xs text-muted-foreground italic">Done</span>}
-                  </td>
-                </tr>
+                <AttendanceRow key={a.id} a={a} i={i} onCheckOut={handleCheckOut} />
               ))}
               {!isLoading && filtered.length === 0 && (
                 <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No check-ins for this date.</td></tr>
@@ -193,12 +184,100 @@ function AttendanceTab() {
             </tbody>
           </table>
         </div>
+
+        {/* Mobile card list */}
+        <div className="sm:hidden space-y-2">
+          {isLoading && <p className="text-center text-sm text-muted-foreground py-6">Loading…</p>}
+          {!isLoading && filtered.length === 0 && (
+            <p className="text-center text-sm text-muted-foreground py-6">No check-ins for this date.</p>
+          )}
+          {!isLoading && filtered.map((a: any, i: number) => {
+            const checkIn  = a.check_in  ? new Date(a.check_in)  : null;
+            const checkOut = a.check_out ? new Date(a.check_out) : null;
+            const fmt = (d: Date) => d.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" });
+            return (
+              <div key={a.id} className="rounded-lg border border-border p-3 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-medium text-sm">{a.profiles?.full_name ?? "—"}</p>
+                    <p className="text-xs text-muted-foreground">{a.profiles?.phone ?? "—"}</p>
+                  </div>
+                  <span className="text-xs text-muted-foreground">#{i + 1}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div>
+                    <p className="text-muted-foreground mb-0.5">Check-in</p>
+                    {checkIn ? (
+                      <Badge variant="outline" className="text-green-600 border-green-300 text-xs">{fmt(checkIn)}</Badge>
+                    ) : "—"}
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground mb-0.5">Check-out</p>
+                    <p>{checkOut ? fmt(checkOut) : <span className="italic text-muted-foreground">still in</span>}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground mb-0.5">Duration</p>
+                    <p>
+                      {checkIn && checkOut
+                        ? fmtDuration(checkOut.getTime() - checkIn.getTime())
+                        : checkIn
+                        ? fmtDuration(Date.now() - checkIn.getTime())
+                        : "—"}
+                    </p>
+                  </div>
+                </div>
+                {!a.check_out && (
+                  <Button size="sm" variant="outline" className="w-full border-blue-400 text-blue-600 hover:bg-blue-50"
+                    onClick={() => handleCheckOut(a.id, a.profiles?.full_name ?? "Member")}>
+                    <Clock className="mr-1.5 h-3.5 w-3.5" /> Check Out
+                  </Button>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </CardContent>
     </Card>
   );
 }
 
-/* ---------------- ACTIVE MEMBERS ---------------- */
+function AttendanceRow({ a, i, onCheckOut }: { a: any; i: number; onCheckOut: (id: string, name: string) => void }) {
+  const fmt = (d: Date) => d.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" });
+  const checkIn  = a.check_in  ? new Date(a.check_in)  : null;
+  const checkOut = a.check_out ? new Date(a.check_out) : null;
+  return (
+    <tr className="border-t border-border">
+      <td className="px-4 py-3 text-muted-foreground">{i + 1}</td>
+      <td className="px-4 py-3 font-medium">{a.profiles?.full_name ?? "—"}</td>
+      <td className="px-4 py-3 text-muted-foreground">{a.profiles?.phone ?? "—"}</td>
+      <td className="px-4 py-3">
+        {checkIn ? (
+          <Badge variant="outline" className="text-green-600 border-green-300">{fmt(checkIn)}</Badge>
+        ) : "—"}
+      </td>
+      <td className="px-4 py-3 text-muted-foreground">
+        {checkOut ? fmt(checkOut) : <span className="text-xs italic">still in</span>}
+      </td>
+      <td className="px-4 py-3">
+        {checkIn && checkOut
+          ? fmtDuration(checkOut.getTime() - checkIn.getTime())
+          : checkIn ? fmtDuration(Date.now() - checkIn.getTime()) : "—"}
+      </td>
+      <td className="px-4 py-3">
+        {!a.check_out ? (
+          <Button size="sm" variant="outline" className="border-blue-400 text-blue-600 hover:bg-blue-50"
+            onClick={() => onCheckOut(a.id, a.profiles?.full_name ?? "Member")}>
+            <Clock className="mr-1.5 h-3.5 w-3.5" /> Check Out
+          </Button>
+        ) : <span className="text-xs text-muted-foreground italic">Done</span>}
+      </td>
+    </tr>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   ACTIVE MEMBERS
+───────────────────────────────────────────── */
 function ActiveMembersTab() {
   const [q, setQ] = useState("");
   const { data: members = [], isLoading } = useQuery({
@@ -215,86 +294,133 @@ function ActiveMembersTab() {
   }, [members]);
 
   const filtered = activeMembers.filter((m: any) =>
-    !q || m.full_name?.toLowerCase().includes(q.toLowerCase()) || m.email?.toLowerCase().includes(q.toLowerCase()) || m.phone?.includes(q)
+    !q || m.full_name?.toLowerCase().includes(q.toLowerCase()) ||
+    m.email?.toLowerCase().includes(q.toLowerCase()) || m.phone?.includes(q)
   );
 
   const sorted = [...filtered].sort((a: any, b: any) => {
-    const aL = a.memberships?.sort((x: any, y: any) => (x.end_date < y.end_date ? 1 : -1))[0];
-    const bL = b.memberships?.sort((x: any, y: any) => (x.end_date < y.end_date ? 1 : -1))[0];
-    return (aL?.end_date ?? "") < (bL?.end_date ?? "") ? -1 : 1;
+    const aE = a.memberships?.sort((x: any, y: any) => (x.end_date < y.end_date ? 1 : -1))[0]?.end_date ?? "";
+    const bE = b.memberships?.sort((x: any, y: any) => (x.end_date < y.end_date ? 1 : -1))[0]?.end_date ?? "";
+    return aE < bE ? -1 : 1;
   });
 
   function expiryBadge(endDate: string) {
     const days = daysBetween(endDate);
-    if (days <= 7) return <Badge variant="destructive">Expires in {days}d</Badge>;
+    if (days <= 7)  return <Badge variant="destructive">Expires in {days}d</Badge>;
     if (days <= 30) return <Badge variant="outline" className="border-yellow-400 text-yellow-600">Expires in {days}d</Badge>;
     return <Badge variant="default">{fmtDate(endDate)}</Badge>;
   }
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-3">
-        <CardTitle className="text-base flex items-center gap-2">
+      <CardHeader className="space-y-3 sm:space-y-0 sm:flex sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+        <CardTitle className="text-base flex items-center gap-2 shrink-0">
           <CheckCircle2 className="h-4 w-4 text-green-500" />
           Active Members
           <Badge variant="secondary" className="ml-1">{activeMembers.length}</Badge>
         </CardTitle>
-        <div className="flex items-center gap-2">
-          <Search className="h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search name / email / phone" value={q} onChange={(e) => setQ(e.target.value)} className="w-64" />
+        <div className="flex items-center gap-2 w-full sm:w-auto sm:max-w-xs">
+          <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+          <Input
+            placeholder="Search name / email / phone"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            className="flex-1"
+          />
         </div>
       </CardHeader>
-      <CardContent className="overflow-auto p-0">
-        <table className="w-full text-sm">
-          <thead className="bg-muted text-xs uppercase text-muted-foreground">
-            <tr>
-              <th className="px-4 py-3 text-left">Name</th>
-              <th className="px-4 py-3 text-left">Contact</th>
-              <th className="px-4 py-3 text-left">Plan</th>
-              <th className="px-4 py-3 text-left">Started</th>
-              <th className="px-4 py-3 text-left">Expires</th>
-              <th className="px-4 py-3 text-left">Payment due</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Loading…</td></tr>}
-            {!isLoading && sorted.map((m: any) => {
-              const latest = m.memberships?.sort((a: any, b: any) => (a.end_date < b.end_date ? 1 : -1))[0];
-              const pendingPayment = (m.payments ?? []).find((p: any) => p.status === "pending" || p.status === "overdue");
-              return (
-                <tr key={m.id} className="border-t border-border">
-                  <td className="px-4 py-3 font-medium">{m.full_name}</td>
-                  <td className="px-4 py-3 text-muted-foreground">
-                    <div>{m.email}</div>
-                    <div className="text-xs">{m.phone}</div>
-                  </td>
-                  <td className="px-4 py-3">{latest?.membership_plans?.name ?? "—"}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{fmtDate(latest?.start_date)}</td>
-                  <td className="px-4 py-3">{latest ? expiryBadge(latest.end_date) : "—"}</td>
-                  <td className="px-4 py-3">
-                    {pendingPayment ? (
-                      <div>
-                        <div className="font-medium text-destructive">{INR(pendingPayment.amount)}</div>
-                        <div className="text-xs text-muted-foreground">Due {fmtDate(pendingPayment.due_date)}</div>
-                      </div>
-                    ) : (
-                      <Badge variant="outline" className="border-green-400 text-green-600 text-xs">Paid</Badge>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-            {!isLoading && sorted.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">No active members.</td></tr>
-            )}
-          </tbody>
-        </table>
+      <CardContent className="p-0">
+        {/* Desktop table */}
+        <div className="hidden sm:block overflow-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted text-xs uppercase text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3 text-left">Name</th>
+                <th className="px-4 py-3 text-left">Contact</th>
+                <th className="px-4 py-3 text-left">Plan</th>
+                <th className="px-4 py-3 text-left">Started</th>
+                <th className="px-4 py-3 text-left">Expires</th>
+                <th className="px-4 py-3 text-left">Payment</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading && <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Loading…</td></tr>}
+              {!isLoading && sorted.map((m: any) => {
+                const latest = m.memberships?.sort((a: any, b: any) => (a.end_date < b.end_date ? 1 : -1))[0];
+                const pendingPayment = (m.payments ?? []).find((p: any) => p.status === "pending" || p.status === "overdue");
+                return (
+                  <tr key={m.id} className="border-t border-border">
+                    <td className="px-4 py-3 font-medium">{m.full_name}</td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      <div>{m.email}</div>
+                      <div className="text-xs">{m.phone}</div>
+                    </td>
+                    <td className="px-4 py-3">{latest?.membership_plans?.name ?? "—"}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{fmtDate(latest?.start_date)}</td>
+                    <td className="px-4 py-3">{latest ? expiryBadge(latest.end_date) : "—"}</td>
+                    <td className="px-4 py-3">
+                      {pendingPayment ? (
+                        <div>
+                          <div className="font-medium text-destructive">{INR(pendingPayment.amount)}</div>
+                          <div className="text-xs text-muted-foreground">Due {fmtDate(pendingPayment.due_date)}</div>
+                        </div>
+                      ) : (
+                        <Badge variant="outline" className="border-green-400 text-green-600 text-xs">Paid</Badge>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+              {!isLoading && sorted.length === 0 && (
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">No active members.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Mobile cards */}
+        <div className="sm:hidden divide-y divide-border">
+          {isLoading && <p className="text-center text-sm text-muted-foreground py-8 px-4">Loading…</p>}
+          {!isLoading && sorted.length === 0 && (
+            <p className="text-center text-sm text-muted-foreground py-8 px-4">No active members.</p>
+          )}
+          {!isLoading && sorted.map((m: any) => {
+            const latest = m.memberships?.sort((a: any, b: any) => (a.end_date < b.end_date ? 1 : -1))[0];
+            const pendingPayment = (m.payments ?? []).find((p: any) => p.status === "pending" || p.status === "overdue");
+            return (
+              <div key={m.id} className="p-4 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-medium text-sm">{m.full_name}</p>
+                    <p className="text-xs text-muted-foreground">{m.email}</p>
+                    <p className="text-xs text-muted-foreground">{m.phone}</p>
+                  </div>
+                  {pendingPayment ? (
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-destructive">{INR(pendingPayment.amount)}</p>
+                      <p className="text-xs text-muted-foreground">Due {fmtDate(pendingPayment.due_date)}</p>
+                    </div>
+                  ) : (
+                    <Badge variant="outline" className="border-green-400 text-green-600 text-xs shrink-0">Paid</Badge>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <span className="text-muted-foreground">Plan: <span className="text-foreground font-medium">{latest?.membership_plans?.name ?? "—"}</span></span>
+                  <span className="text-muted-foreground">From: <span className="text-foreground">{fmtDate(latest?.start_date)}</span></span>
+                </div>
+                <div>{latest ? expiryBadge(latest.end_date) : "—"}</div>
+              </div>
+            );
+          })}
+        </div>
       </CardContent>
     </Card>
   );
 }
 
-/* ---------------- DUE PAYMENTS ---------------- */
+/* ─────────────────────────────────────────────
+   DUE PAYMENTS
+───────────────────────────────────────────── */
 function DuePaymentsTab() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<"due" | "history">("due");
@@ -309,12 +435,9 @@ function DuePaymentsTab() {
   const { data: paidData = { byMembership: new Set<string>(), byUserDate: new Map<string, Set<string>>() } } = useQuery({
     queryKey: ["a-paid-membership-ids"],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("payments")
-        .select("user_id, membership_id, due_date")
-        .in("status", ["paid", "pending"]);
+      const { data } = await supabase.from("payments").select("user_id, membership_id, due_date").in("status", ["paid", "pending"]);
       const byMembership = new Set<string>();
-      const byUserDate = new Map<string, Set<string>>();
+      const byUserDate   = new Map<string, Set<string>>();
       for (const p of data ?? []) {
         if (p.membership_id) {
           byMembership.add(p.membership_id);
@@ -338,9 +461,9 @@ function DuePaymentsTab() {
       if (userDates && userDates.has(latest.end_date)) return false;
       return daysBetween(latest.end_date) <= 3;
     }).sort((a: any, b: any) => {
-      const aL = a.memberships?.sort((x: any, y: any) => (x.end_date < y.end_date ? 1 : -1))[0];
-      const bL = b.memberships?.sort((x: any, y: any) => (x.end_date < y.end_date ? 1 : -1))[0];
-      return (aL?.end_date ?? "") < (bL?.end_date ?? "") ? -1 : 1;
+      const aE = a.memberships?.sort((x: any, y: any) => (x.end_date < y.end_date ? 1 : -1))[0]?.end_date ?? "";
+      const bE = b.memberships?.sort((x: any, y: any) => (x.end_date < y.end_date ? 1 : -1))[0]?.end_date ?? "";
+      return aE < bE ? -1 : 1;
     });
   }, [members, paidIds, paidData]);
 
@@ -354,12 +477,7 @@ function DuePaymentsTab() {
   async function markPaidOffline(member: any) {
     const latest = member.memberships?.sort((a: any, b: any) => (a.end_date < b.end_date ? 1 : -1))[0];
     if (!latest) return toast.error("No membership found");
-    const { data: pending } = await supabase
-      .from("payments")
-      .select("id")
-      .eq("user_id", member.id)
-      .in("status", ["pending", "overdue"])
-      .limit(1);
+    const { data: pending } = await supabase.from("payments").select("id").eq("user_id", member.id).in("status", ["pending", "overdue"]).limit(1);
     const recNo = "OFF-" + Math.random().toString(36).slice(2, 8).toUpperCase();
     if (pending && pending.length > 0) {
       const { error } = await supabase.from("payments").update({
@@ -368,8 +486,8 @@ function DuePaymentsTab() {
       if (error) return toast.error(error.message);
     } else {
       const { error } = await supabase.from("payments").insert({
-        user_id: member.id, membership_id: latest.id, amount: latest.membership_plans?.price ?? 0, due_date: latest.end_date,
-        paid_at: new Date().toISOString(), status: "paid", receipt_no: recNo,
+        user_id: member.id, membership_id: latest.id, amount: latest.membership_plans?.price ?? 0,
+        due_date: latest.end_date, paid_at: new Date().toISOString(), status: "paid", receipt_no: recNo,
       });
       if (error) return toast.error(error.message);
     }
@@ -386,7 +504,7 @@ function DuePaymentsTab() {
 
   function urgencyBadge(endDate: string) {
     const days = daysBetween(endDate);
-    if (days < 0) return <Badge variant="destructive">Expired {Math.abs(days)}d ago</Badge>;
+    if (days < 0)  return <Badge variant="destructive">Expired {Math.abs(days)}d ago</Badge>;
     if (days === 0) return <Badge variant="destructive">Expires today</Badge>;
     return <Badge variant="outline" className="border-orange-400 text-orange-600">Expires in {days}d</Badge>;
   }
@@ -400,15 +518,19 @@ function DuePaymentsTab() {
       </CardHeader>
       <CardContent className="space-y-4">
         <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
-          <TabsList>
-            <TabsTrigger value="due">
-              Due / Expiring Soon
-              {dueMembers.length > 0 && <Badge variant="destructive" className="ml-2 text-xs">{dueMembers.length}</Badge>}
+          <TabsList className="w-full sm:w-auto">
+            <TabsTrigger value="due" className="flex-1 sm:flex-none">
+              Due / Expiring
+              {dueMembers.length > 0 && (
+                <Badge variant="destructive" className="ml-2 text-xs">{dueMembers.length}</Badge>
+              )}
             </TabsTrigger>
-            <TabsTrigger value="history">Payment History</TabsTrigger>
+            <TabsTrigger value="history" className="flex-1 sm:flex-none">History</TabsTrigger>
           </TabsList>
+
           <TabsContent value="due" className="mt-4">
-            <div className="overflow-auto rounded-lg border border-border">
+            {/* Desktop */}
+            <div className="hidden sm:block overflow-auto rounded-lg border border-border">
               <table className="w-full text-sm">
                 <thead className="bg-muted text-xs uppercase text-muted-foreground">
                   <tr>
@@ -416,7 +538,7 @@ function DuePaymentsTab() {
                     <th className="px-4 py-3 text-left">Contact</th>
                     <th className="px-4 py-3 text-left">Plan</th>
                     <th className="px-4 py-3 text-left">Expires</th>
-                    <th className="px-4 py-3 text-left">Amount due</th>
+                    <th className="px-4 py-3 text-left">Amount</th>
                     <th className="px-4 py-3 text-left">Action</th>
                   </tr>
                 </thead>
@@ -430,8 +552,7 @@ function DuePaymentsTab() {
                       <tr key={m.id} className="border-t border-border">
                         <td className="px-4 py-3 font-medium">{m.full_name}</td>
                         <td className="px-4 py-3 text-muted-foreground">
-                          <div>{m.email}</div>
-                          <div className="text-xs">{m.phone}</div>
+                          <div>{m.email}</div><div className="text-xs">{m.phone}</div>
                         </td>
                         <td className="px-4 py-3">{latest?.membership_plans?.name ?? "—"}</td>
                         <td className="px-4 py-3">{latest ? urgencyBadge(latest.end_date) : "—"}</td>
@@ -446,14 +567,49 @@ function DuePaymentsTab() {
                     );
                   })}
                   {!isLoading && dueMembers.length === 0 && (
-                    <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">🎉 No due payments within 7 days.</td></tr>
+                    <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">🎉 No due payments within 3 days.</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
+
+            {/* Mobile cards */}
+            <div className="sm:hidden space-y-2">
+              {isLoading && <p className="text-center text-sm text-muted-foreground py-6">Loading…</p>}
+              {!isLoading && dueMembers.length === 0 && (
+                <p className="text-center text-sm text-muted-foreground py-6">🎉 No due payments within 3 days.</p>
+              )}
+              {!isLoading && dueMembers.map((m: any) => {
+                const latest = m.memberships?.sort((a: any, b: any) => (a.end_date < b.end_date ? 1 : -1))[0];
+                const pendingPmt = (m.payments ?? []).find((p: any) => p.status === "pending" || p.status === "overdue");
+                const amount = pendingPmt?.amount ?? latest?.membership_plans?.price ?? 0;
+                return (
+                  <div key={m.id} className="rounded-lg border border-border p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-medium text-sm">{m.full_name}</p>
+                        <p className="text-xs text-muted-foreground">{m.email}</p>
+                        <p className="text-xs text-muted-foreground">{m.phone}</p>
+                      </div>
+                      <p className="font-semibold text-destructive text-sm">{INR(amount)}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2 text-xs items-center">
+                      <span className="text-muted-foreground">Plan: <span className="text-foreground">{latest?.membership_plans?.name ?? "—"}</span></span>
+                      {latest && urgencyBadge(latest.end_date)}
+                    </div>
+                    <Button size="sm" variant="outline" className="w-full border-green-500 text-green-600 hover:bg-green-50"
+                      onClick={() => { if (confirm(`Mark ${m.full_name} as paid offline?`)) markPaidOffline(m); }}>
+                      <CheckCircle2 className="mr-1.5 h-4 w-4" /> Mark Paid Offline
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
           </TabsContent>
+
           <TabsContent value="history" className="mt-4">
-            <div className="overflow-auto rounded-lg border border-border">
+            {/* Desktop */}
+            <div className="hidden sm:block overflow-auto rounded-lg border border-border">
               <table className="w-full text-sm">
                 <thead className="bg-muted text-xs uppercase text-muted-foreground">
                   <tr>
@@ -474,11 +630,7 @@ function DuePaymentsTab() {
                         {p.profiles?.phone && <div className="text-xs text-muted-foreground">{p.profiles.phone}</div>}
                       </td>
                       <td className="px-4 py-3 font-semibold">{INR(p.amount)}</td>
-                      <td className="px-4 py-3">
-                        {p.status === "paid" && <Badge variant="default" className="bg-green-600">Paid</Badge>}
-                        {p.status === "pending" && <Badge variant="outline" className="border-yellow-400 text-yellow-600">Pending</Badge>}
-                        {p.status === "overdue" && <Badge variant="destructive">Overdue</Badge>}
-                      </td>
+                      <td className="px-4 py-3"><PayStatusBadge status={p.status} /></td>
                       <td className="px-4 py-3 text-muted-foreground">{p.paid_at ? fmtDate(p.paid_at) : <span className="italic text-xs">—</span>}</td>
                       <td className="px-4 py-3 text-muted-foreground">{fmtDate(p.due_date)}</td>
                       <td className="px-4 py-3 text-xs text-muted-foreground font-mono">{p.receipt_no ?? "—"}</td>
@@ -490,6 +642,33 @@ function DuePaymentsTab() {
                 </tbody>
               </table>
             </div>
+
+            {/* Mobile cards */}
+            <div className="sm:hidden space-y-2">
+              {payLoading && <p className="text-center text-sm text-muted-foreground py-6">Loading…</p>}
+              {!payLoading && allPayments.length === 0 && (
+                <p className="text-center text-sm text-muted-foreground py-6">No payment records found.</p>
+              )}
+              {!payLoading && (allPayments as any[]).map((p: any) => (
+                <div key={p.id} className="rounded-lg border border-border p-3 space-y-1.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-medium text-sm">{p.profiles?.full_name ?? "—"}</p>
+                      {p.profiles?.phone && <p className="text-xs text-muted-foreground">{p.profiles.phone}</p>}
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-sm">{INR(p.amount)}</p>
+                      <PayStatusBadge status={p.status} />
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                    {p.paid_at && <span>Paid: {fmtDate(p.paid_at)}</span>}
+                    <span>Due: {fmtDate(p.due_date)}</span>
+                    {p.receipt_no && <span className="font-mono">{p.receipt_no}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
           </TabsContent>
         </Tabs>
       </CardContent>
@@ -497,7 +676,15 @@ function DuePaymentsTab() {
   );
 }
 
-/* ---------------- MEMBERS ---------------- */
+function PayStatusBadge({ status }: { status: string }) {
+  if (status === "paid")    return <Badge variant="default" className="bg-green-600">Paid</Badge>;
+  if (status === "pending") return <Badge variant="outline" className="border-yellow-400 text-yellow-600">Pending</Badge>;
+  return <Badge variant="destructive">Overdue</Badge>;
+}
+
+/* ─────────────────────────────────────────────
+   MEMBERS
+───────────────────────────────────────────── */
 function MembersTab() {
   const qc = useQueryClient();
   const [q, setQ] = useState("");
@@ -512,124 +699,148 @@ function MembersTab() {
   });
 
   const filtered = members.filter((m: any) =>
-    !q || m.full_name?.toLowerCase().includes(q.toLowerCase()) || m.email?.toLowerCase().includes(q.toLowerCase()) || m.phone?.includes(q)
+    !q || m.full_name?.toLowerCase().includes(q.toLowerCase()) ||
+    m.email?.toLowerCase().includes(q.toLowerCase()) || m.phone?.includes(q)
   );
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
-  const paginated = filtered.slice((page - 1) * perPage, page * perPage);
+  const paginated  = filtered.slice((page - 1) * perPage, page * perPage);
 
-  function onSearch(v: string) {
-    setQ(v);
-    setPage(1);
-  }
-
-  function refresh() {
-    setRefreshKey((k) => k + 1);
-    qc.invalidateQueries({ queryKey: ["mem-list"] });
-  }
+  function onSearch(v: string) { setQ(v); setPage(1); }
+  function refresh() { setRefreshKey((k) => k + 1); qc.invalidateQueries({ queryKey: ["mem-list"] }); }
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-3">
-        <CardTitle className="text-base">Members</CardTitle>
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex w-full max-w-xs items-center gap-2">
-            <Search className="h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search name / email / phone" value={q} onChange={(e) => onSearch(e.target.value)} />
+      <CardHeader className="space-y-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle className="text-base">Members</CardTitle>
+          <div className="flex gap-2 flex-wrap">
+            <AddUserDialog onDone={refresh} />
+            <Button variant="outline" size="sm" onClick={() => exportMembersExcel(q ? filtered : members)}>
+              <Download className="mr-1.5 h-4 w-4" /> Export
+            </Button>
           </div>
-          <AddUserDialog onDone={refresh} />
-          <Button variant="outline" size="sm" onClick={() => exportMembersExcel(q ? filtered : members)}>
-            <Download className="mr-1.5 h-4 w-4" /> Export Excel
-          </Button>
+        </div>
+        <div className="flex items-center gap-2">
+          <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+          <Input placeholder="Search name / email / phone" value={q} onChange={(e) => onSearch(e.target.value)} className="flex-1" />
         </div>
       </CardHeader>
-      <CardContent className="overflow-auto p-0">
-        <table className="w-full text-sm">
-          <thead className="bg-muted text-xs uppercase text-muted-foreground">
-            <tr>
-              <th className="px-4 py-3 text-left">Name</th>
-              <th className="px-4 py-3 text-left">Contact</th>
-              <th className="px-4 py-3 text-left">Plan</th>
-              <th className="px-4 py-3 text-left">Expires</th>
-              <th className="px-4 py-3 text-left">Joined</th>
-              <th className="px-4 py-3 text-left">Role</th>
-              <th className="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {paginated.map((m: any) => {
-              const latest = m.memberships?.sort((a: any, b: any) => (a.end_date < b.end_date ? 1 : -1))[0];
-              const expired = latest ? daysBetween(latest.end_date) < 0 : true;
-              return (
-                <tr key={m.id} className="border-t border-border align-top">
-                  <td className="px-4 py-3 font-medium">{m.full_name}</td>
-                  <td className="px-4 py-3 text-muted-foreground">
-                    <div>{m.email}</div>
-                    <div className="text-xs">{m.phone}</div>
-                  </td>
-                  <td className="px-4 py-3">{latest?.membership_plans?.name ?? "—"}</td>
-                  <td className="px-4 py-3">
-                    {latest
-                      ? <Badge variant={expired ? "destructive" : "default"}>{fmtDate(latest.end_date)}</Badge>
-                      : <Badge variant="secondary">none</Badge>}
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">{fmtDate(m.joined_at)}</td>
-                  <td className="px-4 py-3">
-                    <Badge variant={m.role === "admin" ? "default" : "secondary"} className="text-xs">
-                      {m.role ?? "member"}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex justify-end gap-1">
-                      <AssignDialog member={m} onDone={refresh} />
-                      <EditUserDialog member={m} onDone={refresh} />
-                      <DeleteBtn onConfirm={async () => {
-                        const userId = m.email?.split('@')[0];
-                        if (!userId) { toast.error("Cannot determine user ID"); return; }
-                        const { error } = await supabase.rpc("admin_delete_user", { p_user_id: userId });
-                        if (error) toast.error(error.message);
-                        else { toast.success("Member removed"); refresh(); }
-                      }} />
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-            {filtered.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No members.</td></tr>
-            )}
-          </tbody>
-        </table>
 
+      <CardContent className="p-0">
+        {/* Desktop table */}
+        <div className="hidden sm:block overflow-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted text-xs uppercase text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3 text-left">Name</th>
+                <th className="px-4 py-3 text-left">Contact</th>
+                <th className="px-4 py-3 text-left">Plan</th>
+                <th className="px-4 py-3 text-left">Expires</th>
+                <th className="px-4 py-3 text-left">Joined</th>
+                <th className="px-4 py-3 text-left">Role</th>
+                <th className="px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginated.map((m: any) => {
+                const latest  = m.memberships?.sort((a: any, b: any) => (a.end_date < b.end_date ? 1 : -1))[0];
+                const expired = latest ? daysBetween(latest.end_date) < 0 : true;
+                return (
+                  <tr key={m.id} className="border-t border-border align-top">
+                    <td className="px-4 py-3 font-medium">{m.full_name}</td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      <div>{m.email}</div><div className="text-xs">{m.phone}</div>
+                    </td>
+                    <td className="px-4 py-3">{latest?.membership_plans?.name ?? "—"}</td>
+                    <td className="px-4 py-3">
+                      {latest
+                        ? <Badge variant={expired ? "destructive" : "default"}>{fmtDate(latest.end_date)}</Badge>
+                        : <Badge variant="secondary">none</Badge>}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">{fmtDate(m.joined_at)}</td>
+                    <td className="px-4 py-3">
+                      <Badge variant={m.role === "admin" ? "default" : "secondary"} className="text-xs">{m.role ?? "member"}</Badge>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex justify-end gap-1">
+                        <AssignDialog member={m} onDone={refresh} />
+                        <EditUserDialog member={m} onDone={refresh} />
+                        <DeleteBtn onConfirm={async () => {
+                          const userId = m.email?.split("@")[0];
+                          if (!userId) { toast.error("Cannot determine user ID"); return; }
+                          const { error } = await supabase.rpc("admin_delete_user", { p_user_id: userId });
+                          if (error) toast.error(error.message);
+                          else { toast.success("Member removed"); refresh(); }
+                        }} />
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {filtered.length === 0 && (
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No members.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Mobile cards */}
+        <div className="sm:hidden divide-y divide-border">
+          {paginated.length === 0 && (
+            <p className="text-center text-sm text-muted-foreground py-8 px-4">No members.</p>
+          )}
+          {paginated.map((m: any) => {
+            const latest  = m.memberships?.sort((a: any, b: any) => (a.end_date < b.end_date ? 1 : -1))[0];
+            const expired = latest ? daysBetween(latest.end_date) < 0 : true;
+            return (
+              <div key={m.id} className="p-4 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm truncate">{m.full_name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{m.email}</p>
+                    <p className="text-xs text-muted-foreground">{m.phone}</p>
+                  </div>
+                  <Badge variant={m.role === "admin" ? "default" : "secondary"} className="text-xs shrink-0">{m.role ?? "member"}</Badge>
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs items-center">
+                  <span className="text-muted-foreground">Plan: <span className="text-foreground font-medium">{latest?.membership_plans?.name ?? "—"}</span></span>
+                  {latest
+                    ? <Badge variant={expired ? "destructive" : "default"} className="text-xs">{fmtDate(latest.end_date)}</Badge>
+                    : <Badge variant="secondary" className="text-xs">none</Badge>}
+                </div>
+                <p className="text-xs text-muted-foreground">Joined {fmtDate(m.joined_at)}</p>
+                <div className="flex gap-1.5 pt-1">
+                  <AssignDialog member={m} onDone={refresh} />
+                  <EditUserDialog member={m} onDone={refresh} />
+                  <DeleteBtn onConfirm={async () => {
+                    const userId = m.email?.split("@")[0];
+                    if (!userId) { toast.error("Cannot determine user ID"); return; }
+                    const { error } = await supabase.rpc("admin_delete_user", { p_user_id: userId });
+                    if (error) toast.error(error.message);
+                    else { toast.success("Member removed"); refresh(); }
+                  }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-1 border-t border-border px-4 py-3">
+          <div className="flex items-center justify-center gap-1 border-t border-border px-4 py-3 flex-wrap">
             <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(page - 1)}>
-              Prev
+              <ChevronLeft className="h-4 w-4" />
             </Button>
             {Array.from({ length: Math.min(5, totalPages) }, (_, i) => i + 1).map((p) => (
-              <Button
-                key={p}
-                variant={p === page ? "default" : "outline"}
-                size="sm"
-                className="min-w-[2rem]"
-                onClick={() => setPage(p)}
-              >
-                {p}
-              </Button>
+              <Button key={p} variant={p === page ? "default" : "outline"} size="sm" className="min-w-[2rem]" onClick={() => setPage(p)}>{p}</Button>
             ))}
             {totalPages > 6 && <span className="px-1 text-sm text-muted-foreground">…</span>}
             {totalPages > 6 && (
-              <Button
-                variant={page === totalPages ? "default" : "outline"}
-                size="sm"
-                className="min-w-[2rem]"
-                onClick={() => setPage(totalPages)}
-              >
-                {totalPages}
-              </Button>
+              <Button variant={page === totalPages ? "default" : "outline"} size="sm" className="min-w-[2rem]" onClick={() => setPage(totalPages)}>{totalPages}</Button>
             )}
             <Button variant="outline" size="sm" disabled={page === totalPages} onClick={() => setPage(page + 1)}>
-              Next
+              <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
         )}
@@ -641,12 +852,10 @@ function MembersTab() {
 function exportMembersExcel(members: any[]) {
   if (!members.length) return toast.info("Nothing to export");
   const data = members.map((m: any) => {
-    const latest = m.memberships?.sort((a: any, b: any) => (a.end_date < b.end_date ? 1 : -1))[0];
+    const latest  = m.memberships?.sort((a: any, b: any) => (a.end_date < b.end_date ? 1 : -1))[0];
     const expired = latest ? daysBetween(latest.end_date) < 0 : true;
     return {
-      Name: m.full_name ?? "",
-      Email: m.email ?? "",
-      Phone: m.phone ?? "",
+      Name: m.full_name ?? "", Email: m.email ?? "", Phone: m.phone ?? "",
       Plan: latest?.membership_plans?.name ?? "—",
       Expires: latest ? fmtDate(latest.end_date) : "—",
       Status: expired ? "Expired" : latest ? "Active" : "No plan",
@@ -659,14 +868,14 @@ function exportMembersExcel(members: any[]) {
   XLSX.writeFile(wb, `members-${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
-/* ---- Add User Dialog ---- */
+/* ─── Add User Dialog ─── */
 function AddUserDialog({ onDone }: { onDone: () => void }) {
-  const [open, setOpen] = useState(false);
-  const [idNo, setIdNo] = useState("");
+  const [open, setOpen]       = useState(false);
+  const [idNo, setIdNo]       = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [showPw, setShowPw] = useState(false);
+  const [phone, setPhone]     = useState("");
+  const [showPw, setShowPw]   = useState(false);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -675,9 +884,9 @@ function AddUserDialog({ onDone }: { onDone: () => void }) {
     setLoading(true);
     try {
       const { data: sessionData } = await supabase.auth.getSession();
-      const adminToken = sessionData.session?.access_token;
+      const adminToken   = sessionData.session?.access_token;
       const adminRefresh = sessionData.session?.refresh_token;
-      const adminUserId = sessionData.session?.user?.id;
+      const adminUserId  = sessionData.session?.user?.id;
       if (!adminToken) throw new Error("No admin session");
 
       const email = `${idNo.trim().toLowerCase()}@srgym.local`;
@@ -713,23 +922,16 @@ function AddUserDialog({ onDone }: { onDone: () => void }) {
       <DialogTrigger asChild>
         <Button size="sm"><UserPlus className="mr-1.5 h-4 w-4" /> Add Member</Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="w-[calc(100%-2rem)] max-w-md mx-auto">
         <DialogHeader><DialogTitle>Add new member</DialogTitle></DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="au-idno">ID No</Label>
-            <Input id="au-idno" value={idNo} onChange={(e) => setIdNo(e.target.value)} placeholder="e.g. newmember1" required />
-          </div>
-          <div>
-            <Label htmlFor="au-name">Full Name</Label>
-            <Input id="au-name" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="e.g. John Doe" required />
-          </div>
-          <div>
-            <Label htmlFor="au-phone">Phone</Label>
-            <Input id="au-phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="e.g. 9876543210" />
-          </div>
-          <div>
-            <Label htmlFor="au-pw">Password</Label>
+          <div><Label htmlFor="au-idno">ID No</Label>
+            <Input id="au-idno" value={idNo} onChange={(e) => setIdNo(e.target.value)} placeholder="e.g. newmember1" required /></div>
+          <div><Label htmlFor="au-name">Full Name</Label>
+            <Input id="au-name" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="e.g. John Doe" required /></div>
+          <div><Label htmlFor="au-phone">Phone</Label>
+            <Input id="au-phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="e.g. 9876543210" /></div>
+          <div><Label htmlFor="au-pw">Password</Label>
             <div className="relative">
               <Input id="au-pw" type={showPw ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} required />
               <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground">
@@ -746,14 +948,14 @@ function AddUserDialog({ onDone }: { onDone: () => void }) {
   );
 }
 
-/* ---- Edit User Dialog ---- */
+/* ─── Edit User Dialog ─── */
 function EditUserDialog({ member, onDone }: { member: any; onDone: () => void }) {
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState(member.full_name ?? "");
-  const [phone, setPhone] = useState(member.phone ?? "");
+  const [open, setOpen]         = useState(false);
+  const [name, setName]         = useState(member.full_name ?? "");
+  const [phone, setPhone]       = useState(member.phone ?? "");
   const [password, setPassword] = useState("");
-  const [showPw, setShowPw] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [showPw, setShowPw]     = useState(false);
+  const [loading, setLoading]   = useState(false);
 
   const userId = member.email?.replace(/@srgym\.local$/, "") ?? member.id;
 
@@ -765,16 +967,12 @@ function EditUserDialog({ member, onDone }: { member: any; onDone: () => void })
       if (phone) profileUpdates.phone = phone;
       const { error: profileErr } = await supabase.from("profiles").update(profileUpdates).eq("id", member.id);
       if (profileErr) throw profileErr;
-
       if (password) {
         const { error: rpcErr } = await supabase.rpc("admin_update_user", { p_user_id: userId, p_password: password, p_name: name });
         if (rpcErr) throw rpcErr;
       }
-
       toast.success("Member updated");
-      setOpen(false);
-      setPassword("");
-      onDone();
+      setOpen(false); setPassword(""); onDone();
     } catch (err: any) {
       toast.error(err.message || "Failed to update member");
     } finally {
@@ -785,11 +983,9 @@ function EditUserDialog({ member, onDone }: { member: any; onDone: () => void })
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" variant="outline" className="mr-1">
-          <KeyRound className="h-3.5 w-3.5 mr-1" /> Edit
-        </Button>
+        <Button size="sm" variant="outline"><KeyRound className="h-3.5 w-3.5 mr-1" /> Edit</Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="w-[calc(100%-2rem)] max-w-md mx-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <KeyRound className="h-4 w-4 text-muted-foreground" /> Edit — {member.full_name}
@@ -801,14 +997,10 @@ function EditUserDialog({ member, onDone }: { member: any; onDone: () => void })
             <Input id="eu-idno" value={userId} disabled className="opacity-60 cursor-not-allowed" />
             <p className="text-xs text-muted-foreground mt-1">ID cannot be changed after creation.</p>
           </div>
-          <div>
-            <Label htmlFor="eu-name">Full Name</Label>
-            <Input id="eu-name" value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
-          <div>
-            <Label htmlFor="eu-phone">Phone</Label>
-            <Input id="eu-phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
-          </div>
+          <div><Label htmlFor="eu-name">Full Name</Label>
+            <Input id="eu-name" value={name} onChange={(e) => setName(e.target.value)} /></div>
+          <div><Label htmlFor="eu-phone">Phone</Label>
+            <Input id="eu-phone" value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
           <div>
             <Label htmlFor="eu-pw">New Password <span className="text-muted-foreground font-normal">(leave blank to keep)</span></Label>
             <div className="relative">
@@ -827,36 +1019,35 @@ function EditUserDialog({ member, onDone }: { member: any; onDone: () => void })
   );
 }
 
-/* ---- Assign Dialog (Membership + Payment + Workout + Diet) ---- */
+/* ─── Assign Dialog (Membership + Payment + Workout + Diet) ─── */
 function AssignDialog({ member, onDone }: any) {
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<"membership" | "payment" | "workout" | "diet">("membership");
+  const [tab, setTab]   = useState<"membership" | "payment" | "workout" | "diet">("membership");
 
-  /* membership state */
   const { data: plans = [] } = useQuery({
     queryKey: ["aplans"],
     queryFn: async () => (await supabase.from("membership_plans").select("*").eq("is_active", true)).data ?? [],
     enabled: open,
   });
-  const tiers = [
-    { name: "Monthly", months: 1 },
-    { name: "3 Months", months: 3 },
-    { name: "6 Months", months: 6 },
-    { name: "Yearly", months: 12 },
-  ];
-  const [planId, setPlanId] = useState("");
-  const [start, setStart] = useState(new Date().toISOString().slice(0, 10));
-  const [amount, setAmount] = useState("");
-  const [due, setDue] = useState(new Date().toISOString().slice(0, 10));
 
-  const plan = plans.find((p: any) => p.id === planId);
+  const tiers = [
+    { name: "Monthly",  months: 1  },
+    { name: "3 Months", months: 3  },
+    { name: "6 Months", months: 6  },
+    { name: "Yearly",   months: 12 },
+  ];
+
+  const [planId, setPlanId] = useState("");
+  const [start, setStart]   = useState(new Date().toISOString().slice(0, 10));
+  const [amount, setAmount] = useState("");
+  const [due, setDue]       = useState(new Date().toISOString().slice(0, 10));
+
+  const plan    = plans.find((p: any) => p.id === planId);
   const endDate = plan
     ? new Date(new Date(start).setMonth(new Date(start).getMonth() + plan.duration_months)).toISOString().slice(0, 10)
     : "";
 
-  /* workout / diet state */
   const qc = useQueryClient();
-
   const { data: memberPlans = [], isLoading: plansLoading } = useQuery({
     queryKey: ["member-plans", member.id],
     queryFn: async () =>
@@ -864,11 +1055,11 @@ function AssignDialog({ member, onDone }: any) {
     enabled: open && (tab === "workout" || tab === "diet"),
   });
 
-  const [wpTitle, setWpTitle] = useState("");
+  const [wpTitle, setWpTitle]   = useState("");
   const [wpContent, setWpContent] = useState("");
-  const [dpTitle, setDpTitle] = useState("");
+  const [dpTitle, setDpTitle]   = useState("");
   const [dpContent, setDpContent] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving]     = useState(false);
 
   async function assignMembership() {
     if (!plan) return toast.error("Pick a plan");
@@ -886,7 +1077,7 @@ function AssignDialog({ member, onDone }: any) {
 
   async function logPayment() {
     if (!amount) return toast.error("Enter amount");
-    const { data: mem } = await supabase.from("memberships").select("id").eq("user_id", member.id).order("end_date", { ascending: false }).limit(1).single().maybeSingle();
+    const { data: mem } = await supabase.from("memberships").select("id").eq("user_id", member.id).order("end_date", { ascending: false }).limit(1).maybeSingle();
     const { error } = await supabase.from("payments").insert({
       user_id: member.id, membership_id: mem?.id ?? null, amount: Number(amount), due_date: due,
       paid_at: new Date().toISOString(), status: "paid",
@@ -901,20 +1092,17 @@ function AssignDialog({ member, onDone }: any) {
   }
 
   async function savePlan(type: "workout" | "diet") {
-    const title = type === "workout" ? wpTitle : dpTitle;
+    const title   = type === "workout" ? wpTitle   : dpTitle;
     const content = type === "workout" ? wpContent : dpContent;
     if (!title.trim() || !content.trim()) return toast.error("Title and content are required");
     setSaving(true);
     try {
-      const { error } = await supabase.from("member_plans").insert({
-        user_id: member.id, type, title: title.trim(), content: content.trim(),
-      });
+      const { error } = await supabase.from("member_plans").insert({ user_id: member.id, type, title: title.trim(), content: content.trim() });
       if (error) throw error;
       await supabase.from("notifications").insert({
         user_id: member.id,
         title: type === "workout" ? "New Workout Plan 💪" : "New Diet Plan 🥗",
-        message: `Your trainer has assigned a new ${type} plan: "${title}". Check it out!`,
-        type: "info",
+        message: `Your trainer has assigned a new ${type} plan: "${title}". Check it out!`, type: "info",
       });
       toast.success(`${type === "workout" ? "Workout" : "Diet"} plan saved`);
       if (type === "workout") { setWpTitle(""); setWpContent(""); }
@@ -935,28 +1123,27 @@ function AssignDialog({ member, onDone }: any) {
   }
 
   const workoutPlans = (memberPlans as any[]).filter((p) => p.type === "workout");
-  const dietPlans = (memberPlans as any[]).filter((p) => p.type === "diet");
+  const dietPlans    = (memberPlans as any[]).filter((p) => p.type === "diet");
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild><Button size="sm" variant="outline">Manage</Button></DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[calc(100%-2rem)] max-w-2xl mx-auto max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Manage — {member.full_name}</DialogTitle>
         </DialogHeader>
         <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
-          <TabsList className="grid grid-cols-4">
-            <TabsTrigger value="membership">Plan</TabsTrigger>
-            <TabsTrigger value="payment">Payment</TabsTrigger>
-            <TabsTrigger value="workout" className="flex items-center gap-1.5">
-              <Dumbbell className="h-3.5 w-3.5" /> Workout
+          <TabsList className="grid grid-cols-4 w-full">
+            <TabsTrigger value="membership" className="text-xs sm:text-sm">Plan</TabsTrigger>
+            <TabsTrigger value="payment"    className="text-xs sm:text-sm">Payment</TabsTrigger>
+            <TabsTrigger value="workout"    className="text-xs sm:text-sm flex items-center gap-1">
+              <Dumbbell className="h-3 w-3 sm:h-3.5 sm:w-3.5" /><span className="hidden sm:inline">Workout</span><span className="sm:hidden">Gym</span>
             </TabsTrigger>
-            <TabsTrigger value="diet" className="flex items-center gap-1.5">
-              <Utensils className="h-3.5 w-3.5" /> Diet
+            <TabsTrigger value="diet"       className="text-xs sm:text-sm flex items-center gap-1">
+              <Utensils className="h-3 w-3 sm:h-3.5 sm:w-3.5" /> Diet
             </TabsTrigger>
           </TabsList>
 
-          {/* ---- Membership tab ---- */}
           <TabsContent value="membership" className="mt-4 space-y-3">
             <Label>Plan</Label>
             <div className="grid grid-cols-2 gap-2">
@@ -966,8 +1153,8 @@ function AssignDialog({ member, onDone }: any) {
                 return (
                   <button key={tier.name} type="button" onClick={() => p && setPlanId(p.id)} disabled={!p}
                     className={`rounded-lg border p-3 text-left transition-colors ${selected ? "border-primary bg-primary/10" : "border-border"} ${!p ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:border-primary/50"}`}>
-                    <div className="font-medium">{tier.name}</div>
-                    <div className="text-sm text-muted-foreground">{p ? `${INR(p.price)} / ${tier.name}` : "Not configured"}</div>
+                    <div className="font-medium text-sm">{tier.name}</div>
+                    <div className="text-xs text-muted-foreground">{p ? `${INR(p.price)} / ${tier.name}` : "Not configured"}</div>
                   </button>
                 );
               })}
@@ -977,111 +1164,40 @@ function AssignDialog({ member, onDone }: any) {
             <Button onClick={assignMembership} className="w-full bg-gradient-red text-primary-foreground">Assign & invoice</Button>
           </TabsContent>
 
-          {/* ---- Payment tab ---- */}
           <TabsContent value="payment" className="mt-4 space-y-3">
             <div><Label>Amount (₹)</Label><Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
             <div><Label>Due date</Label><Input type="date" value={due} onChange={(e) => setDue(e.target.value)} /></div>
             <Button onClick={logPayment} className="w-full bg-gradient-red text-primary-foreground">Record paid</Button>
           </TabsContent>
 
-          {/* ---- Workout tab ---- */}
           <TabsContent value="workout" className="mt-4 space-y-4">
             <div className="rounded-lg border border-border p-4 space-y-3 bg-muted/30">
-              <h3 className="text-sm font-semibold flex items-center gap-2">
-                <Plus className="h-4 w-4 text-primary" /> Add Workout Plan
-              </h3>
-              <div>
-                <Label>Title</Label>
-                <Input value={wpTitle} onChange={(e) => setWpTitle(e.target.value)} placeholder="e.g. Chest & Triceps Day" />
-              </div>
-              <div>
-                <Label>Plan details</Label>
-                <Textarea
-                  rows={5}
-                  value={wpContent}
-                  onChange={(e) => setWpContent(e.target.value)}
-                  placeholder={"e.g.\nBench Press — 4×10\nIncline DB Press — 3×12\nTricep Pushdown — 3×15\n..."}
-                />
-              </div>
+              <h3 className="text-sm font-semibold flex items-center gap-2"><Plus className="h-4 w-4 text-primary" /> Add Workout Plan</h3>
+              <div><Label>Title</Label>
+                <Input value={wpTitle} onChange={(e) => setWpTitle(e.target.value)} placeholder="e.g. Chest & Triceps Day" /></div>
+              <div><Label>Plan details</Label>
+                <Textarea rows={5} value={wpContent} onChange={(e) => setWpContent(e.target.value)}
+                  placeholder={"e.g.\nBench Press — 4×10\nIncline DB Press — 3×12\n..."} /></div>
               <Button onClick={() => savePlan("workout")} disabled={saving} className="w-full bg-gradient-red text-primary-foreground">
                 <Dumbbell className="mr-1.5 h-4 w-4" /> {saving ? "Saving…" : "Save Workout Plan"}
               </Button>
             </div>
-
-            {/* Existing workout plans */}
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                Assigned Plans ({workoutPlans.length})
-              </h3>
-              {plansLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
-              {!plansLoading && workoutPlans.length === 0 && (
-                <p className="text-sm text-muted-foreground italic">No workout plans assigned yet.</p>
-              )}
-              {workoutPlans.map((p: any) => (
-                <div key={p.id} className="rounded-lg border border-border p-3 space-y-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="font-medium text-sm">{p.title}</p>
-                      <p className="text-xs text-muted-foreground">{fmtDate(p.assigned_at)}</p>
-                    </div>
-                    <Button size="icon" variant="ghost" onClick={() => { if (confirm("Delete this plan?")) deletePlan(p.id); }}>
-                      <X className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                  <pre className="text-xs text-muted-foreground whitespace-pre-wrap bg-muted rounded p-2 mt-1">{p.content}</pre>
-                </div>
-              ))}
-            </div>
+            <PlanList plans={workoutPlans} loading={plansLoading} label="workout" onDelete={deletePlan} />
           </TabsContent>
 
-          {/* ---- Diet tab ---- */}
           <TabsContent value="diet" className="mt-4 space-y-4">
             <div className="rounded-lg border border-border p-4 space-y-3 bg-muted/30">
-              <h3 className="text-sm font-semibold flex items-center gap-2">
-                <Plus className="h-4 w-4 text-primary" /> Add Diet Plan
-              </h3>
-              <div>
-                <Label>Title</Label>
-                <Input value={dpTitle} onChange={(e) => setDpTitle(e.target.value)} placeholder="e.g. High Protein Cutting Diet" />
-              </div>
-              <div>
-                <Label>Plan details</Label>
-                <Textarea
-                  rows={5}
-                  value={dpContent}
-                  onChange={(e) => setDpContent(e.target.value)}
-                  placeholder={"e.g.\nBreakfast: 6 eggs, oats, banana\nLunch: Chicken breast, rice, veggies\nSnack: Whey protein + almonds\nDinner: Paneer, salad, chapati\n..."}
-                />
-              </div>
+              <h3 className="text-sm font-semibold flex items-center gap-2"><Plus className="h-4 w-4 text-primary" /> Add Diet Plan</h3>
+              <div><Label>Title</Label>
+                <Input value={dpTitle} onChange={(e) => setDpTitle(e.target.value)} placeholder="e.g. High Protein Cutting Diet" /></div>
+              <div><Label>Plan details</Label>
+                <Textarea rows={5} value={dpContent} onChange={(e) => setDpContent(e.target.value)}
+                  placeholder={"e.g.\nBreakfast: 6 eggs, oats\nLunch: Chicken breast, rice\n..."} /></div>
               <Button onClick={() => savePlan("diet")} disabled={saving} className="w-full bg-gradient-red text-primary-foreground">
                 <Utensils className="mr-1.5 h-4 w-4" /> {saving ? "Saving…" : "Save Diet Plan"}
               </Button>
             </div>
-
-            {/* Existing diet plans */}
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                Assigned Plans ({dietPlans.length})
-              </h3>
-              {plansLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
-              {!plansLoading && dietPlans.length === 0 && (
-                <p className="text-sm text-muted-foreground italic">No diet plans assigned yet.</p>
-              )}
-              {dietPlans.map((p: any) => (
-                <div key={p.id} className="rounded-lg border border-border p-3 space-y-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="font-medium text-sm">{p.title}</p>
-                      <p className="text-xs text-muted-foreground">{fmtDate(p.assigned_at)}</p>
-                    </div>
-                    <Button size="icon" variant="ghost" onClick={() => { if (confirm("Delete this plan?")) deletePlan(p.id); }}>
-                      <X className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                  <pre className="text-xs text-muted-foreground whitespace-pre-wrap bg-muted rounded p-2 mt-1">{p.content}</pre>
-                </div>
-              ))}
-            </div>
+            <PlanList plans={dietPlans} loading={plansLoading} label="diet" onDelete={deletePlan} />
           </TabsContent>
         </Tabs>
       </DialogContent>
@@ -1089,7 +1205,37 @@ function AssignDialog({ member, onDone }: any) {
   );
 }
 
-/* ---------------- PLANS ---------------- */
+function PlanList({ plans, loading, label, onDelete }: { plans: any[]; loading: boolean; label: string; onDelete: (id: string) => void }) {
+  return (
+    <div className="space-y-2">
+      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+        Assigned Plans ({plans.length})
+      </h3>
+      {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {!loading && plans.length === 0 && (
+        <p className="text-sm text-muted-foreground italic">No {label} plans assigned yet.</p>
+      )}
+      {plans.map((p: any) => (
+        <div key={p.id} className="rounded-lg border border-border p-3 space-y-1">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="font-medium text-sm">{p.title}</p>
+              <p className="text-xs text-muted-foreground">{fmtDate(p.assigned_at)}</p>
+            </div>
+            <Button size="icon" variant="ghost" onClick={() => { if (confirm("Delete this plan?")) onDelete(p.id); }}>
+              <X className="h-4 w-4 text-destructive" />
+            </Button>
+          </div>
+          <pre className="text-xs text-muted-foreground whitespace-pre-wrap bg-muted rounded p-2 mt-1">{p.content}</pre>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   PLANS
+───────────────────────────────────────────── */
 function PlansTab() {
   const qc = useQueryClient();
   const { data: plans = [] } = useQuery({
@@ -1107,10 +1253,10 @@ function PlansTab() {
   }, [plans]);
 
   const tiers = [
-    { name: "Monthly", key: "monthly", months: 1 },
-    { name: "3 Months", key: "3months", months: 3 },
-    { name: "6 Months", key: "6months", months: 6 },
-    { name: "Yearly", key: "yearly", months: 12 },
+    { name: "Monthly",  months: 1  },
+    { name: "3 Months", months: 3  },
+    { name: "6 Months", months: 6  },
+    { name: "Yearly",   months: 12 },
   ];
 
   async function savePrice(name: string, months: number) {
@@ -1129,12 +1275,14 @@ function PlansTab() {
   }
 
   return (
-    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
       {tiers.map((tier) => {
         const plan = plans.find((p: any) => p.name === tier.name);
         return (
-          <Card key={tier.key}>
-            <CardHeader><CardTitle className="text-base">{tier.name}</CardTitle></CardHeader>
+          <Card key={tier.name}>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">{tier.name}</CardTitle>
+            </CardHeader>
             <CardContent className="space-y-4">
               <div>
                 <Label>Price (₹)</Label>
@@ -1163,7 +1311,9 @@ function PlansTab() {
   );
 }
 
-/* ---------------- BROADCAST ---------------- */
+/* ─────────────────────────────────────────────
+   BROADCAST
+───────────────────────────────────────────── */
 function BroadcastTab() {
   const [form, setForm] = useState({ title: "", message: "", type: "info" });
   const [sending, setSending] = useState(false);
@@ -1188,16 +1338,18 @@ function BroadcastTab() {
   }
 
   return (
-    <Card>
+    <Card className="max-w-xl">
       <CardHeader>
         <CardTitle className="text-base flex items-center gap-2">
-          <Megaphone className="h-4 w-4 text-primary" /> Broadcast notification
+          <Megaphone className="h-4 w-4 text-primary" /> Broadcast Notification
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
-        <p className="text-sm text-muted-foreground">Sends a notification to every member's inbox individually.</p>
-        <div><Label>Title</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. Gym closed tomorrow" /></div>
-        <div><Label>Message</Label><Textarea rows={4} value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} placeholder="Write your message here…" /></div>
+      <CardContent className="space-y-4">
+        <p className="text-sm text-muted-foreground">Sends a notification to every member's inbox.</p>
+        <div><Label>Title</Label>
+          <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. Gym closed tomorrow" /></div>
+        <div><Label>Message</Label>
+          <Textarea rows={4} value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} placeholder="Write your message here…" /></div>
         <div>
           <Label>Type</Label>
           <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
@@ -1210,7 +1362,7 @@ function BroadcastTab() {
             </SelectContent>
           </Select>
         </div>
-        <Button onClick={send} disabled={sending} className="bg-gradient-red text-primary-foreground">
+        <Button onClick={send} disabled={sending} className="w-full bg-gradient-red text-primary-foreground">
           <Megaphone className="mr-1.5 h-4 w-4" />
           {sending ? "Sending…" : "Send to all members"}
         </Button>
@@ -1219,7 +1371,9 @@ function BroadcastTab() {
   );
 }
 
-/* ---------------- HOLIDAYS ---------------- */
+/* ─────────────────────────────────────────────
+   HOLIDAYS
+───────────────────────────────────────────── */
 function HolidaysTab() {
   const qc = useQueryClient();
   const { data: holidays = [] } = useQuery({
@@ -1255,27 +1409,32 @@ function HolidaysTab() {
   }
 
   return (
-    <div className="grid gap-6 md:grid-cols-2">
+    <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
       <Card>
-        <CardHeader><CardTitle className="text-base">Add holiday</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">Add Holiday</CardTitle></CardHeader>
         <CardContent className="space-y-3">
-          <div><Label>Date</Label><Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></div>
-          <div><Label>Title</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></div>
-          <div><Label>Description</Label><Textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
-          <Button onClick={add} disabled={adding} className="bg-gradient-red text-primary-foreground">
-            {adding ? "Adding…" : "Add holiday"}
+          <div><Label>Date</Label>
+            <Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></div>
+          <div><Label>Title</Label>
+            <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. Independence Day" /></div>
+          <div><Label>Description</Label>
+            <Textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Optional details…" /></div>
+          <Button onClick={add} disabled={adding} className="w-full bg-gradient-red text-primary-foreground">
+            {adding ? "Adding…" : "Add Holiday & Notify Members"}
           </Button>
         </CardContent>
       </Card>
+
       <Card>
-        <CardHeader><CardTitle className="text-base">Upcoming</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">Upcoming Holidays</CardTitle></CardHeader>
         <CardContent className="space-y-2">
+          {holidays.length === 0 && <p className="text-sm text-muted-foreground">No holidays scheduled.</p>}
           {holidays.map((h: any) => (
-            <div key={h.id} className="flex items-center justify-between rounded border border-border p-3 text-sm">
-              <div>
-                <div className="font-medium">{h.title}</div>
-                <div className="text-xs text-muted-foreground">{fmtDate(h.date)}</div>
-                {h.description && <div className="text-xs text-muted-foreground mt-0.5">{h.description}</div>}
+            <div key={h.id} className="flex items-start justify-between gap-2 rounded-lg border border-border p-3 text-sm">
+              <div className="min-w-0">
+                <p className="font-medium truncate">{h.title}</p>
+                <p className="text-xs text-muted-foreground">{fmtDate(h.date)}</p>
+                {h.description && <p className="text-xs text-muted-foreground mt-0.5">{h.description}</p>}
               </div>
               <DeleteBtn onConfirm={async () => {
                 await supabase.from("holidays").delete().eq("id", h.id);
@@ -1283,26 +1442,20 @@ function HolidaysTab() {
               }} />
             </div>
           ))}
-          {holidays.length === 0 && <p className="text-sm text-muted-foreground">No holidays.</p>}
         </CardContent>
       </Card>
     </div>
   );
 }
 
-/* ---------------- helpers ---------------- */
+/* ─────────────────────────────────────────────
+   HELPERS
+───────────────────────────────────────────── */
 function DeleteBtn({ onConfirm }: { onConfirm: () => void | Promise<void> }) {
   return (
-    <Button size="icon" variant="ghost" onClick={() => { if (confirm("Delete? This cannot be undone.")) onConfirm(); }}>
+    <Button size="icon" variant="ghost" className="shrink-0"
+      onClick={() => { if (confirm("Delete? This cannot be undone.")) onConfirm(); }}>
       <Trash2 className="h-4 w-4 text-destructive" />
     </Button>
   );
-}
-
-function exportExcel(filename: string, rows: any[]) {
-  if (!rows.length) return toast.info("Nothing to export");
-  const ws = XLSX.utils.json_to_sheet(rows);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
-  XLSX.writeFile(wb, `${filename}-${new Date().toISOString().slice(0, 10)}.xlsx`);
 }

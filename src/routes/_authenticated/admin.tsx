@@ -87,6 +87,8 @@ function resolvePaymentStatus(member: any): PaymentState {
 
   if (!latest) return { status: "no-data" };
 
+  if (latest.paid) return { status: "paid" };
+
   // payments linked to this specific membership
   const relevant = payments.filter(
     (p) => p.membership_id === latest.id || !p.membership_id
@@ -519,46 +521,14 @@ function DuePaymentsTab() {
   const [tab, setTab] = useState<"due" | "history">("due");
   const [justPaidIds, setJustPaidIds] = useState<Set<string>>(new Set());
 
-  const { data: members = [], isLoading: membersLoading } = useQuery({
+  const { data: members = [], isLoading } = useQuery({
     queryKey: ["a-due-payments"],
     queryFn: async () => (await supabase.rpc("admin_get_members")).data ?? [],
     staleTime: 60000,
   });
 
-  // Fetch all payments directly — same approach as ActiveMembersTab
-  const { data: allPaymentsRaw = [], isLoading: paymentsLoading } = useQuery({
-    queryKey: ["a-all-payments-live"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("payments")
-        .select("id, user_id, membership_id, amount, due_date, status, paid_at, receipt_no");
-      if (error) throw error;
-      return data ?? [];
-    },
-    staleTime: 30000,
-  });
-
-  const isLoading = membersLoading || paymentsLoading;
-
-  // Build user_id → payments[] map
-  const paymentsByUser = useMemo(() => {
-    const map = new Map<string, any[]>();
-    for (const p of allPaymentsRaw as any[]) {
-      if (!map.has(p.user_id)) map.set(p.user_id, []);
-      map.get(p.user_id)!.push(p);
-    }
-    return map;
-  }, [allPaymentsRaw]);
-
-  // Merge live payments into members
-  const membersWithPayments = useMemo(() => {
-    return (members as any[]).map((m: any) => ({
-      ...m,
-      payments: paymentsByUser.get(m.id) ?? [],
-    }));
-  }, [members, paymentsByUser]);
   const dueMembers = useMemo(() => {
-  return membersWithPayments
+  return (members as any[])
     .filter((m: any) => {
       if (justPaidIds.has(m.id)) return false;
 
@@ -567,11 +537,8 @@ function DuePaymentsTab() {
       )[0];
 
       if (!latest) return false;
-
-      const daysLeft = daysBetween(latest.end_date);
-
-      // Only show if expiry is within 7 days
-      return daysLeft <= 7;
+      if (latest.paid) return false;
+      return daysBetween(latest.end_date) <= 7;
     })
     .sort((a: any, b: any) => {
       const aEnd =
@@ -586,7 +553,7 @@ function DuePaymentsTab() {
 
       return aEnd < bEnd ? -1 : 1;
     });
-}, [membersWithPayments, justPaidIds]);
+}, [members, justPaidIds]);
 
   const { data: allPayments = [], isLoading: payLoading } = useQuery({
     queryKey: ["a-payment-history"],
@@ -598,7 +565,7 @@ function DuePaymentsTab() {
   async function markPaidOffline(member: any) {
     const latest = member.memberships?.sort((a: any, b: any) => (a.end_date < b.end_date ? 1 : -1))[0];
     if (!latest) return toast.error("No membership found");
-    const { data: pending } = await supabase.from("payments").select("id").eq("user_id", member.id).in("status", ["pending", "overdue"]).limit(1);
+    const { data: pending } = await supabase.from("payments").select("id").eq("user_id", member.id).in("status", ["pending", "overdue", "awaiting_verification"]).limit(1);
     const recNo = "OFF-" + Math.random().toString(36).slice(2, 8).toUpperCase();
     if (pending && pending.length > 0) {
       const { error } = await supabase.from("payments").update({
@@ -612,6 +579,8 @@ function DuePaymentsTab() {
       });
       if (error) return toast.error(error.message);
     }
+    const { error: paidErr } = await supabase.from("memberships").update({ paid: true }).eq("id", latest.id);
+    if (paidErr) return toast.error("Payment recorded but failed to update membership: " + paidErr.message);
     await supabase.from("notifications").insert({
       user_id: member.id, title: "Payment recorded",
       message: `Offline payment received for ${latest.membership_plans?.name ?? "membership"}. Thank you!`, type: "success",
@@ -668,8 +637,7 @@ function DuePaymentsTab() {
                   {isLoading && <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Loading…</td></tr>}
                   {!isLoading && dueMembers.map((m: any) => {
                     const latest = m.memberships?.sort((a: any, b: any) => (a.end_date < b.end_date ? 1 : -1))[0];
-                    const pendingPmt = (m.payments ?? []).find((p: any) => p.status === "pending" || p.status === "overdue");
-                    const amount = pendingPmt?.amount ?? latest?.membership_plans?.price ?? 0;
+                    const amount = latest?.membership_plans?.price ?? 0;
                     return (
                       <tr key={m.id} className="border-t border-border">
                         <td className="px-4 py-3 font-medium">{m.full_name}</td>
@@ -702,8 +670,7 @@ function DuePaymentsTab() {
               )}
               {!isLoading && dueMembers.map((m: any) => {
                 const latest = m.memberships?.sort((a: any, b: any) => (a.end_date < b.end_date ? 1 : -1))[0];
-                const pendingPmt = (m.payments ?? []).find((p: any) => p.status === "pending" || p.status === "overdue");
-                const amount = pendingPmt?.amount ?? latest?.membership_plans?.price ?? 0;
+                const amount = latest?.membership_plans?.price ?? 0;
                 return (
                   <div key={m.id} className="rounded-lg border border-border p-4 space-y-3">
                     <div className="flex items-start justify-between gap-2">
@@ -1232,6 +1199,10 @@ function AssignDialog({ member, onDone }: any) {
         paid_at: new Date().toISOString(), status: "paid", receipt_no: recNo,
       });
       if (error) return toast.error(error.message);
+    }
+
+    if (mem?.id) {
+      await supabase.from("memberships").update({ paid: true }).eq("id", mem.id);
     }
 
     await supabase.from("notifications").insert({

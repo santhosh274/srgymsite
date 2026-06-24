@@ -30,6 +30,7 @@ BEGIN
             'end_date', m.end_date,
             'status', m.status,
             'plan_id', m.plan_id,
+            'paid', m.paid,
             'membership_plans', jsonb_build_object('name', mp.name, 'price', mp.price)
           )
           ORDER BY m.end_date DESC

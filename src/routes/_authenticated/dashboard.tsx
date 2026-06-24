@@ -176,13 +176,7 @@ function MemberDashboard() {
   const openRecord = todayRecords.find((a: any) => !a.check_out);
   const canCheckIn = todayCount < 3;
   const sessions30 = attendance.filter((a: any) => daysBetween(a.date) > -30).length;
-  const paymentStatus = payments.some((p) => p.status === "overdue")
-    ? "overdue"
-    : payments.some((p) => p.status === "awaiting_verification")
-    ? "verifying"
-    : payments.some((p) => p.status === "pending")
-    ? "pending"
-    : "ok";
+  const paymentStatus = membership?.paid ? "ok" : "unpaid";
 
   /* ── Check-in ── */
   async function checkIn() {
@@ -295,19 +289,13 @@ function MemberDashboard() {
           icon={CreditCard}
           label="Payment"
           value={
-            paymentStatus === "overdue"
-              ? "Overdue"
-              : paymentStatus === "verifying"
-              ? "Verifying"
-              : paymentStatus === "pending"
-              ? "Pending"
+            paymentStatus === "unpaid"
+              ? "Unpaid"
               : "Up to date"
           }
           sub={payments[0] ? `Last due: ${fmtDate(payments[0].due_date)}` : "No payments yet"}
           tone={
-            paymentStatus === "overdue"
-              ? "danger"
-              : paymentStatus === "pending" || paymentStatus === "verifying"
+            paymentStatus === "unpaid"
               ? "warn"
               : "ok"
           }
@@ -497,7 +485,7 @@ function MemberDashboard() {
         {/* ── PAYMENTS ── */}
         <TabsContent value="payments" className="mt-4 space-y-4">
           {/* Quick pay via UPI */}
-          {payments.filter(p => p.status === "pending" || p.status === "overdue").length > 0 && (
+          {!membership?.paid && payments.filter(p => p.status === "pending" || p.status === "overdue").length > 0 && (
             <Card>
               <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
                 <div>
@@ -510,8 +498,10 @@ function MemberDashboard() {
                 </div>
                 <Button onClick={() => {
                   const pending = payments.find(p => p.status === "pending" || p.status === "overdue")!;
-                  const vpa = "8015755889-3@ybl";
-                  window.location.href = `upi://pay?pa=${vpa}&pn=SRGYM&am=${pending.amount}&tn=Membership%20Payment&cu=INR`;
+                  const vpa = "8015755889@ybl";
+                  const amt = Number(pending.amount).toFixed(2);
+                  const txnRef = "TXN" + Date.now() + Math.random().toString(36).slice(2, 8).toUpperCase();
+                  window.location.href = `upi://pay?pa=${vpa}&pn=SRGYM&am=${amt}&tr=${txnRef}&tn=Membership%20Payment&cu=INR`;
                 }}>
                   Pay with UPI
                 </Button>

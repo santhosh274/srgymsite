@@ -244,6 +244,7 @@ export type Database = {
           end_date: string
           frozen: boolean
           id: string
+          paid: boolean
           plan_id: string | null
           start_date: string
           status: string
@@ -254,6 +255,7 @@ export type Database = {
           end_date: string
           frozen?: boolean
           id?: string
+          paid?: boolean
           plan_id?: string | null
           start_date?: string
           status?: string
@@ -264,6 +266,7 @@ export type Database = {
           end_date?: string
           frozen?: boolean
           id?: string
+          paid?: boolean
           plan_id?: string | null
           start_date?: string
           status?: string
